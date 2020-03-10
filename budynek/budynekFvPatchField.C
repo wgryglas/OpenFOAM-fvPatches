@@ -219,9 +219,10 @@ Foam::budynekFvPatchField::snGradTransformDiag() const
 void Foam::budynekFvPatchField::updateBoundaryValues()
 {
     struct IOdata *Wsk_St_IOdata = (struct IOdata*)malloc(sizeof(struct IOdata));
+//    fvPatchField
 
   //  std::cout <<"OBLICZENIA MOJE\n" << std::endl;
-    const fvMesh& mesh = dimensionedInternalField().mesh();
+    const fvMesh& mesh = internalField().mesh();
     const volScalarField& p = db().lookupObject<volScalarField>("p");
     const volVectorField& U = db().lookupObject<volVectorField>("U");
     const labelUList& fc = patch().faceCells();

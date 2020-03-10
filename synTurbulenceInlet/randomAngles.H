@@ -20,6 +20,10 @@ namespace Foam {
 
         Random m_random;
 
+        inline scalar scalar01() {
+            return m_random.sample01<scalar>();
+        }
+
     public:
         randomAngles(int nmodes);
         //Default copy/assign constructors

@@ -29,9 +29,10 @@ License
 #include "Time.H"
 #include "Pstream.H"
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
+#include <string>
 namespace Foam
 {
+
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 synTurbulenceInletFvPatchField::synTurbulenceInletFvPatchField
@@ -63,7 +64,8 @@ synTurbulenceInletFvPatchField::synTurbulenceInletFvPatchField
     curTimeIndex_(-1),
     synTurb_(ptf.synTurb_),
     corelate_(false)
-{}
+{
+}
 
 
 synTurbulenceInletFvPatchField::synTurbulenceInletFvPatchField
@@ -73,20 +75,18 @@ synTurbulenceInletFvPatchField::synTurbulenceInletFvPatchField
     const dictionary& dict
 )
 :
-    fixedValueFvPatchVectorField(p, iF),
+    fixedValueFvPatchVectorField(p, iF, dict, false),
     flucts_(p.size(),vector::zero),
     referenceField_("referenceField", dict, p.size()),
     curTimeIndex_(-1),
     synTurb_(db(), dict),
     corelate_(false)
 {
-    if (dict.found("value"))
-    {
-        (*this)==vectorField("value", dict, p.size());
+    if (dict.found("value")) {
         flucts_ = (*this) - referenceField_;
         corelate_=true;
     }
-    synTurb_.setRefVelocity(mag(average(referenceField_)));
+    synTurb_.setRefVelocity(average(mag(referenceField_)));
 }
 
 
@@ -101,7 +101,8 @@ synTurbulenceInletFvPatchField::synTurbulenceInletFvPatchField
     curTimeIndex_(-1),
     synTurb_(ptf.synTurb_),
     corelate_(false)
-{}
+{
+}
 
 
 synTurbulenceInletFvPatchField::synTurbulenceInletFvPatchField
@@ -116,7 +117,8 @@ synTurbulenceInletFvPatchField::synTurbulenceInletFvPatchField
     curTimeIndex_(-1),
     synTurb_(ptf.synTurb_),
     corelate_(false)
-{}
+{
+}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -129,7 +131,7 @@ void synTurbulenceInletFvPatchField::autoMap
     fixedValueFvPatchVectorField::autoMap(m);
     flucts_.autoMap(m);
     referenceField_.autoMap(m);
-    synTurb_.setRefVelocity(mag(average(referenceField_)));
+    synTurb_.setRefVelocity(average(mag(referenceField_)));
 }
 
 
@@ -146,9 +148,8 @@ void synTurbulenceInletFvPatchField::rmap
 
     flucts_.rmap(tiptf.flucts_, addr);
     referenceField_.rmap(tiptf.referenceField_, addr);
-    synTurb_.setRefVelocity(mag(average(referenceField_)));
+    synTurb_.setRefVelocity(average(mag(referenceField_)));
 }
-
 
 
 void synTurbulenceInletFvPatchField::updateCoeffs()
