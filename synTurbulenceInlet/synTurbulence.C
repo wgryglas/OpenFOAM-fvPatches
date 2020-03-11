@@ -2,17 +2,32 @@
 
 #include "dictionary.H"
 #include "Ostream.H"
-#include "constants.H"
 #include "Pstream.H"
+#include <limits>
 
 namespace Foam
 {
+    static scalar smallestEdgeLength(const fvMesh& mesh) {
+        const edgeList& edges = mesh.edges();
+        const pointField& pp = mesh.points();
+        scalar min = std::numeric_limits<scalar>::max();
+        forAll (edges, edgei) {
+            scalar el = edges[edgei].mag(pp);
+            if (el < min) {
+                min = el;
+            }
+        }
+        return min;
+    }
+
+    const scalar synTurbulence::Ce = 1.452762113;
+
     synTurbulence::synTurbulence(const objectRegistry& reg)
     :
         db_(reg),
         m_dxmin(0.5),
         m_nmodes(150),
-        m_wew1fct(2.),
+        m_minWavelengthFactor(2.),
         m_visc(1.),
         m_qm(0.015),
         m_sli(0.05),
@@ -22,27 +37,34 @@ namespace Foam
         m_T(1.),
         m_u_inf(1.),
         m_ti(0.1),
-        angles_(m_nmodes)
-    {
+        m_angles(m_nmodes) {
         updateParameters();
     }
 
-    synTurbulence::synTurbulence(const objectRegistry& reg, const dictionary& dict)
+    synTurbulence::synTurbulence(const objectRegistry& reg, const dictionary& dict, const fvMesh& mesh)
     :
         db_(reg),
         m_dxmin( 0.5 ),
-        m_nmodes( dict.lookupOrDefault<scalar>("nmodes",150) ),
-        m_wew1fct(2.),
+        m_nmodes( dict.lookupOrDefault<scalar>("nmodes", 150) ),
+        m_minWavelengthFactor(2.),
         m_qm(0.015),
         m_sli(0.05),
         m_up(1.),
         m_epsm(1.),
         m_dt(0.1),
         m_u_inf(1.),
-        angles_(m_nmodes)
+        m_angles(m_nmodes)
     {
         dict.lookup("nu") >> m_visc;
-        dict.lookup("dxmin") >> m_dxmin;
+
+
+        if( dict.found("dxmin") ){
+            dict.lookup("dxmin") >> m_dxmin;
+        }
+        else {
+           m_dxmin = smallestEdgeLength(mesh);
+        }
+
         dict.lookup("turbIntensity") >> m_ti;
         dict.lookup("turbScale") >> m_sli;
 
@@ -52,128 +74,68 @@ namespace Foam
         updateParameters();
     }
 
-    void synTurbulence::updateParameters()
-    {
+    void synTurbulence::updateParameters() {
         //Read from transoportProperties dictionary
 //        const dictionary& transportProperties = db_.lookupObject<IOdictionary>("transportProperties");
 //        dimensionedScalar viscosity(transportProperties.lookup("nu"));
 //        m_visc = viscosity.value();
         m_up = m_ti*m_u_inf;
         m_qm = 1.5*m_up*m_up;
-        m_epsm = std::pow(m_qm,1.5)/m_sli;
+        m_epsm = Foam::pow(m_qm, 1.5) / m_sli;
 
-        if(m_u_inf != 0)
-        {
+        if(m_u_inf != 0) {
             m_T = m_qm/m_epsm;
         }
-        else
-        {
+        else {
             m_T = 0;
         }
     }
 
-    void synTurbulence::setRefVelocity(scalar u_inf)
-    {
+    void synTurbulence::setRefVelocity(scalar u_inf) {
         m_u_inf = u_inf;
         updateParameters();
     }
 
-    void synTurbulence::setTurbulenceIntensity(scalar ti)
-    {
+    void synTurbulence::setTurbulenceIntensity(scalar ti) {
         m_ti = ti;
         updateParameters();
     }
 
-    void synTurbulence::setMinDivision(scalar dxmin)
-    {
+    void synTurbulence::setMinDivision(scalar dxmin) {
         m_dxmin = dxmin;
         updateParameters();
     }
 
-    void synTurbulence::setNumModes(label nmodes)
-    {
+    void synTurbulence::setNumModes(label nmodes) {
         m_nmodes = nmodes;
         updateParameters();
     }
 
-    void synTurbulence::setViscosity(scalar vis)
-    {
+    void synTurbulence::setViscosity(scalar vis) {
         m_visc = vis;
         updateParameters();
     }
 
-    void synTurbulence::setCharacteristicLengthScale(scalar sli)
-    {
+    void synTurbulence::setCharacteristicLengthScale(scalar sli) {
         m_sli = sli;
         updateParameters();
     }
 
-    void synTurbulence::setTimeStep(scalar dt)
-    {
+    void synTurbulence::setTimeStep(scalar dt) {
         m_dt = dt;
         updateParameters();
     }
 
+    void synTurbulence::computeNewFluctuations(const vectorField &coords, vectorField &flucts, bool corelate) {
+        using namespace constant::mathematical;
+        using namespace Foam;
 
-    scalar synTurbulence::dxmin() const
-    {
-        return m_dxmin;
-    }
-
-    label synTurbulence::nmodes() const
-    {
-        return m_nmodes;
-    }
-
-    scalar synTurbulence::wew1fct() const
-    {
-        return m_wew1fct;
-    }
-
-    scalar synTurbulence::visc() const
-    {
-        return m_visc;
-    }
-
-    scalar synTurbulence::qm() const
-    {
-        return m_qm;
-    }
-
-    scalar synTurbulence::sli() const
-    {
-        return m_sli;
-    }
-
-    scalar synTurbulence::up() const
-    {
-        return m_up;
-    }
-
-    scalar synTurbulence::epsm() const
-    {
-        return m_epsm;;
-    }
-
-    scalar synTurbulence::dt() const
-    {
-        return m_dt;
-    }
-
-    scalar synTurbulence::T() const
-    {
-        return m_T;
-    }
-
-    void synTurbulence::computeNewFluctuations(const vectorField &coords, vectorField &flucts, bool corelate)
-    {
-        angles_.RecomputeRandomAngles();
+        m_angles.RecomputeRandomAngles();
 
         if(coords.size() == 0)
             return;
 
         double amp = 1.452762113;
-        double pi = constant::mathematical::pi;
         int n = coords.size();
         // Deklaracje zmiennych potrzebnych w programie
         double wnrn, wnre, wnreta, wnr1, dkl;
@@ -187,8 +149,8 @@ namespace Foam
 
         double a, b;
 
-        a = std::exp(-dt()/T());
-        b = std::sqrt(1-a*a);
+        a = exp(-dt()/T());
+        b = sqrt(1-a*a);
 
         //temporal tables for fluctuation
         double *u = new double[n];
@@ -207,13 +169,13 @@ namespace Foam
 
 
         // Najwyzsza liczba falowa
-        wnrn = 2*pi/dxmin();
+        wnrn = pi / dxmin();
 
         // Liczba falowa zwiazana z modem o najwiekszej energii
         wnre = 9*pi*amp/(55*sli());
 
         // Liczba falowa uzyta w czlonie lepkim w spektrum von Karmana
-        wnreta = std::pow((epsm()/std::pow(visc(), 3.0)), 0.25);
+        wnreta = pow((epsm()/pow(visc(), 3.0)), 0.25);
 
         // Najmniejsza liczba falowa
         wnr1 = wnre/wew1fct();
@@ -226,8 +188,7 @@ namespace Foam
             wnrf[m] = wnr1+dkl*(double)m;
 
         // Wyznacz liczby falowe w srodkach podzialow
-        for(int m = 0; m<nmodes(); ++m)
-        {
+        for(int m = 0; m<nmodes(); ++m) {
             wnr[m] = 0.5*(wnrf[m] + wnrf[m+1]);
             dkn[m] = wnrf[m+1] -wnrf[m];
         }
@@ -235,15 +196,15 @@ namespace Foam
         // Wektory falowe z losowych katow
         for(int m = 0; m<nmodes(); ++m)
         {
-            kxio[m] = std::sin(angles_.GetTetha()[m])*std::cos(angles_.GetPhi()[m]);
-            kyio[m] = std::sin(angles_.GetTetha()[m])*std::sin(angles_.GetPhi()[m]);
-            kzio[m] = std::cos(angles_.GetTetha()[m]);
+            kxio[m] = sin(m_angles.GetTetha()[m])*cos(m_angles.GetPhi()[m]);
+            kyio[m] = sin(m_angles.GetTetha()[m])*sin(m_angles.GetPhi()[m]);
+            kzio[m] = cos(m_angles.GetTetha()[m]);
 
             // sigma (s = sigma) z losowych katow. Sigma jest wersorem, ktory
             // wyznacza kierunek syntetycznego wektora predkosci (u, v, w)
-            sxio[m]=std::cos(angles_.GetPhi()[m])*std::cos(angles_.GetTetha()[m])*std::cos(angles_.GetAlpha()[m])-std::sin(angles_.GetPhi()[m])*std::sin(angles_.GetAlpha()[m]);
-            syio[m]=std::sin(angles_.GetPhi()[m])*std::cos(angles_.GetTetha()[m])*std::cos(angles_.GetAlpha()[m])+std::cos(angles_.GetPhi()[m])*std::sin(angles_.GetAlpha()[m]);
-            szio[m]=-std::sin(angles_.GetTetha()[m])*std::cos(angles_.GetAlpha()[m]);
+            sxio[m]=cos(m_angles.GetPhi()[m])*cos(m_angles.GetTetha()[m])*cos(m_angles.GetAlpha()[m])-sin(m_angles.GetPhi()[m])*sin(m_angles.GetAlpha()[m]);
+            syio[m]=sin(m_angles.GetPhi()[m])*cos(m_angles.GetTetha()[m])*cos(m_angles.GetAlpha()[m])+cos(m_angles.GetPhi()[m])*sin(m_angles.GetAlpha()[m]);
+            szio[m]=-sin(m_angles.GetTetha()[m])*cos(m_angles.GetAlpha()[m]);
         }
 
         // Petla po siatce
@@ -272,20 +233,20 @@ namespace Foam
                 kx = kxi*wnr[m];
                 ky = kyi*wnr[m];
                 kz = kzi*wnr[m];
-                rk = std::sqrt(kx*kx + ky*ky + kz*kz);
+                rk = sqrt(kx*kx + ky*ky + kz*kz);
 
                 // Jesli liczba falowa rk jest mniejsza niz najwieksza dopuszczalna,
                 // wygeneruj fluktuacje
                 if(rk < wnrn)
                 {
-                    arg = kx*xc + ky*yc + kz*zc + angles_.GetPsi()[m];
+                    arg = kx*xc + ky*yc + kz*zc + m_angles.GetPsi()[m];
 
-                    tfunk = std::cos(arg);
+                    tfunk = cos(arg);
 
                     // Spektrum von Karmana
-                    e = amp/wnre*std::pow(wnr[m]/wnre,4.0)/(std::pow(1+std::pow(wnr[m]/wnre,2.0),17./6.))*std::exp(-2*std::pow(wnr[m]/wnreta,2.0));
+                    e = amp/wnre*pow(wnr[m]/wnre,4.0)/(pow(1+pow(wnr[m]/wnre,2.0),17./6.))*exp(-2*pow(wnr[m]/wnreta,2.0));
 
-                    utn = std::sqrt(e*up()*up()*dkn[m]);
+                    utn = sqrt(e*up()*up()*dkn[m]);
 
                     // Syntetyczne pole predkosci
                     utrp += 2*utn*tfunk*sx;

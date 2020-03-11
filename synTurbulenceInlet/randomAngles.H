@@ -20,7 +20,7 @@ namespace Foam {
 
         Random m_random;
 
-        inline scalar scalar01() {
+        inline scalar randomScalar01() {
             return m_random.sample01<scalar>();
         }
 

@@ -79,12 +79,16 @@ synTurbulenceInletFvPatchField::synTurbulenceInletFvPatchField
     flucts_(p.size(),vector::zero),
     referenceField_("referenceField", dict, p.size()),
     curTimeIndex_(-1),
-    synTurb_(db(), dict),
+    synTurb_(db(), dict, iF.mesh()),
     corelate_(false)
 {
     if (dict.found("value")) {
         flucts_ = (*this) - referenceField_;
-        corelate_=true;
+        corelate_ = true;
+    }
+    else {
+        fixedValueFvPatchVectorField::operator=(referenceField_);
+//        *((fixedValueFvPatchVectorField*)this) = (const UList&)referenceField_;
     }
     synTurb_.setRefVelocity(average(mag(referenceField_)));
 }
