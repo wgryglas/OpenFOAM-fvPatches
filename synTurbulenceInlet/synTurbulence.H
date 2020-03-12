@@ -13,6 +13,13 @@
 
 namespace Foam
 {
+    class synTurbulenceParameters {
+        virtual tmp<scalarField> getTurbLengthScale(const vectorField& coords) const;
+        virtual tmp<scalarField> getUrms(const vectorField& coords) const;
+        virtual tmp<scalarField> getDissipationRate(const vectorField& coords) const;
+        virtual ~synTurbulenceParameters() {}
+    };
+
     class synTurbulence
     {
         const objectRegistry& db_;
@@ -39,7 +46,8 @@ namespace Foam
 
         // Kolmogorove wavelength
         scalar kEtha(const scalar& nu, const scalar& eps) const {
-            return pow(eps / (nu*nu*nu), 0.25);
+            using constant::mathematical::pi;
+            return 2*pi * pow(eps / (nu*nu*nu), 0.25);
         }
         inline scalar kEtha() const {
             return kEtha(visc(), m_epsm);
@@ -151,6 +159,8 @@ namespace Foam
         scalar T() const {
             return m_T;
         }
+
+        void computeNonuniformFlucts(const vectorField & coords, vectorField & flucts, bool corelate=true);
 
         void computeNewFluctuations(const vectorField & coords, vectorField & flucts, bool corelate=true);
 

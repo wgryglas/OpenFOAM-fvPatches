@@ -82,13 +82,17 @@ synTurbulenceInletFvPatchField::synTurbulenceInletFvPatchField
     synTurb_(db(), dict, iF.mesh()),
     corelate_(false)
 {
+    vectorField& patchField = *this;
+
     if (dict.found("value")) {
-        flucts_ = (*this) - referenceField_;
-        corelate_ = true;
+        patchField = vectorField("value", dict, p.size());
+        flucts_ = patchField - referenceField_;
+        if(average(mag(flucts_)) > 10-6)
+            corelate_ = true;
     }
     else {
+        patchField = referenceField_;
         fixedValueFvPatchVectorField::operator=(referenceField_);
-//        *((fixedValueFvPatchVectorField*)this) = (const UList&)referenceField_;
     }
     synTurb_.setRefVelocity(average(mag(referenceField_)));
 }
@@ -155,7 +159,8 @@ void synTurbulenceInletFvPatchField::rmap
     synTurb_.setRefVelocity(average(mag(referenceField_)));
 }
 
-
+#include "OPstream.H"
+#include "IPstream.H"
 void synTurbulenceInletFvPatchField::updateCoeffs()
 {
     if (this->updated())
@@ -163,9 +168,11 @@ void synTurbulenceInletFvPatchField::updateCoeffs()
         return;
     }
 
+//    Warning << "Updating boundary values of "<<this->patch().name()<<", ref field is " << average(mag(referenceField_)) <<", is my proc id " << Pstream::myProcNo() << endl;
+
     if (curTimeIndex_ != this->db().time().timeIndex())
     {
-        vectorField& patchField =*this;
+        vectorField& patchField = *this;
         const vectorField& faceCenters = this->patch().Cf();
 
         synTurb_.setTimeStep(db().time().deltaT().value());
@@ -174,7 +181,10 @@ void synTurbulenceInletFvPatchField::updateCoeffs()
         if(!corelate_)
             corelate_=true;
 
+
         patchField = referenceField_ + flucts_;
+
+        Warning << average(mag(referenceField_)) <<", " << average(mag(patchField)) << endl;
 
 //        vectorField& patchField = *this;
 
@@ -202,9 +212,9 @@ void synTurbulenceInletFvPatchField::updateCoeffs()
 //            );
 
         curTimeIndex_ = this->db().time().timeIndex();
-    }
 
-    fixedValueFvPatchVectorField::updateCoeffs();
+        fixedValueFvPatchVectorField::updateCoeffs();
+    }
 }
 
 

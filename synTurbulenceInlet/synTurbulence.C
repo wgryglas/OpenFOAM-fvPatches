@@ -126,6 +126,39 @@ namespace Foam
         updateParameters();
     }
 
+
+    tmp<scalarField> linspace(scalar min, scalar max, label size) {
+        tmp<scalarField> ptr = tmp<scalarField>(new scalarField(size, min));
+        scalarField& values = ptr.ref();
+        scalar dx = (min - max) / (size -1);
+        for(label i = 1; i<size; ++i) {
+            values[i] += i*dx;
+        }
+        return ptr;
+    }
+
+    void synTurbulence::computeNonuniformFlucts(const vectorField &coords, vectorField &flucts, bool corelate) {
+        using constant::mathematical::pi;
+
+        m_angles.RecomputeRandomAngles();
+
+        if(coords.size() == 0)
+            return;
+
+        scalar kmin = kMin();
+        scalar kmax = kMax();
+
+        //update in loop if nonuniform eps
+        scalar k_etha = kEtha();
+
+        label N = coords.size();
+        label M = nmodes();
+
+        vectorField t_flucts(N, vector::zero);
+    }
+
+
+
     void synTurbulence::computeNewFluctuations(const vectorField &coords, vectorField &flucts, bool corelate) {
         using namespace constant::mathematical;
         using namespace Foam;
@@ -175,7 +208,7 @@ namespace Foam
         wnre = 9*pi*amp/(55*sli());
 
         // Liczba falowa uzyta w czlonie lepkim w spektrum von Karmana
-        wnreta = pow((epsm()/pow(visc(), 3.0)), 0.25);
+        wnreta = 2*pi * pow((epsm()/pow(visc(), 3.0)), 0.25);
 
         // Najmniejsza liczba falowa
         wnr1 = wnre/wew1fct();
@@ -188,7 +221,7 @@ namespace Foam
             wnrf[m] = wnr1+dkl*(double)m;
 
         // Wyznacz liczby falowe w srodkach podzialow
-        for(int m = 0; m<nmodes(); ++m) {
+        for(int m = 0; m < nmodes(); ++m) {
             wnr[m] = 0.5*(wnrf[m] + wnrf[m+1]);
             dkn[m] = wnrf[m+1] -wnrf[m];
         }
