@@ -176,11 +176,11 @@ void synTurbulenceInletFvPatchField::updateCoeffs()
         const vectorField& faceCenters = this->patch().Cf();
 
         synTurb_.setTimeStep(db().time().deltaT().value());
-        synTurb_.computeNewFluctuations(faceCenters, flucts_, corelate_);
+        //synTurb_.computeNewFluctuations(faceCenters, flucts_, corelate_);
+        synTurb_.computeNonuniformFlucts(faceCenters, this->db().time().value(), flucts_, corelate_);
 
-        if(!corelate_)
-            corelate_=true;
-
+        if( ! corelate_ )
+            corelate_ = true;
 
         patchField = referenceField_ + flucts_;
 

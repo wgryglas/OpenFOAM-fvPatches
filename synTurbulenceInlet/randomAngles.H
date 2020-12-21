@@ -28,7 +28,7 @@ namespace Foam {
         randomAngles(int nmodes);
         //Default copy/assign constructors
 
-        virtual ~randomAngles(){}
+        //virtual ~randomAngles(){}
 
         inline const scalarField& GetPhi() const;
         inline const scalarField& GetPsi() const;
@@ -43,23 +43,19 @@ namespace Foam {
         void RecomputeRandomAngles();
     };
 
-    const scalarField& randomAngles::GetPhi() const
-    {
+    const scalarField& randomAngles::GetPhi() const {
         return m_phi;
     }
 
-    const scalarField& randomAngles::GetPsi() const
-    {
+    const scalarField& randomAngles::GetPsi() const {
         return m_psi;
     }
 
-    const scalarField& randomAngles::GetAlpha() const
-    {
+    const scalarField& randomAngles::GetAlpha() const {
         return m_alpha;
     }
 
-    const scalarField& randomAngles::GetTetha() const
-    {
+    const scalarField& randomAngles::GetTetha() const {
         return m_tetha;
     }
 

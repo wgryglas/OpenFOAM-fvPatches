@@ -13,11 +13,14 @@
 
 namespace Foam
 {
-    class synTurbulenceParameters {
-        virtual tmp<scalarField> getTurbLengthScale(const vectorField& coords) const;
-        virtual tmp<scalarField> getUrms(const vectorField& coords) const;
-        virtual tmp<scalarField> getDissipationRate(const vectorField& coords) const;
+    struct synTurbulenceParameters: tmp<synTurbulenceParameters>::refCount {
+        virtual void update(const vectorField& coords, const scalar& timeValue) = 0;
+        virtual const scalarField& getTurbLengthScales() const  = 0;
+        virtual const scalarField& getUrms() const  = 0;
+        virtual const scalarField& getDissipationRates() const  = 0;
+        virtual const scalarField& getTimeScales() const = 0;
         virtual ~synTurbulenceParameters() {}
+        virtual void write(Ostream& os) const = 0;
     };
 
     class synTurbulence
@@ -39,59 +42,59 @@ namespace Foam
 
         randomAngles m_angles;
 
+        tmp<synTurbulenceParameters> properites;
+
         void updateParameters();
 
         // Coefficient required for von Karman spectral energy
         static const scalar Ce;
 
         // Kolmogorove wavelength
-        scalar kEtha(const scalar& nu, const scalar& eps) const {
+        scalar kolmogorovWavelength(const scalar& nu, const scalar& eps) const {
             using constant::mathematical::pi;
             return 2*pi * pow(eps / (nu*nu*nu), 0.25);
         }
-        inline scalar kEtha() const {
-            return kEtha(visc(), m_epsm);
+        tmp<scalarField> kolmogorovWavelength(const scalar &nu, const scalarField &eps) const {
+            tmp<scalarField> tmpRes(new scalarField(eps.size(), 0.0));
+            scalarField& res = tmpRes.ref();
+            forAll(eps, i) {
+                res[i] = kolmogorovWavelength(nu, eps[i]);
+            }
+            return tmpRes;
         }
 
-        // highest value of possible wavelengths under given mesh grid
+        // highest value of possible wavelengths under current mesh grid
         scalar kMax() const {
             using namespace constant::mathematical;
             return pi / m_dxmin;
         }
 
         // the most energetic wavelength
-        scalar kE() const {
+        scalar kE(const scalar& turbLengthScale) const {
             using namespace constant::mathematical;
-            return (Ce * 9 * pi) / (55 * m_sli);
+            return (Ce * 9 * pi) / (55 * turbLengthScale);
         }
 
         // smallest possible wavelengths
-        scalar kMin() const {
-            return kE() / m_minWavelengthFactor;
+        scalar kMin(const scalar& turbLengthScale) const {
+            return kE(turbLengthScale) / m_minWavelengthFactor;
         }
 
-        // Kolmogorov energy spectrum
-        scalar E(const scalar& k, const scalar& u_rms, const scalar& k_e, const scalar& k_eta) const {
+        // Kolmogorov energy spectrum releated to given wavelength k.
+        // u_mrs - mean root square of fluctuations, k_e - the most energetic wavelength, k_etha - Kolmogorow wavelength
+        scalar E(const scalar& k, const scalar& u_mrs, const scalar& k_e, const scalar& k_etha) const {
             scalar k_ratio = k / k_e;
-            return Ce * u_rms*u_rms / k_e * pow(k_ratio, 4) / (1 + k_ratio*k_ratio, 17.0/6) * exp(-2*(k/k_eta));
-        }
-        inline scalar E(const scalar& k, const scalar& u_rms) const {
-            return E(k, u_rms, kE(), kEtha());
-        }
-        inline scalar E(const scalar& k) const {
-            return E(k, up(), kE(), kEtha());
+            scalar k_etha_ratio = k / k_etha;
+            return Ce * (u_mrs*u_mrs / k_e) * pow(k_ratio, 4.0) / pow(1 + k_ratio*k_ratio, 17.0/6) * exp(-2*k_etha_ratio*k_etha_ratio);
         }
 
-        // velocity ampl. for the fourier mode related to given wavelength k (based on energy contribution from wavelengths in the range k < ... < k + dk)
-        scalar uAmpl(const scalar& k, const scalar& dk, const scalar& u_rms, const scalar& k_max, const scalar& k_eta) {
-            return sqrt(E(k, u_rms, k_max, k_eta) * dk);
+        // velocity fluctuation ampl. for the fourier mode related to given wavelength k (based on energy contribution from wavelengths in the range k < ... < k + dk)
+        // k - given wavelength, dk - wevelengths valus width used for energy range,
+        // u_mrs - mrs of total vel. fluctuation, k_max - maximal possible wavelength and k_etha - kolmogorow wavelength
+        scalar uAmpl(const scalar& k, const scalar& dk, const scalar& u_mrs, const scalar& k_max, const scalar& k_eta) {
+            return sqrt( E(k, u_mrs, k_max, k_eta) * dk );
         }
-        inline scalar uAmpl(const scalar& k, const scalar& dk, const scalar& u_rms) {
-            return uAmpl(k, dk, u_rms, kE(), kEtha());
-        }
-        inline scalar uAmpl(const scalar& k, const scalar& dk) {
-            return uAmpl(k, dk, up(), kE(), kEtha());
-        }
+
 
 
     public:
@@ -124,17 +127,21 @@ namespace Foam
         /**
          * @return number of modes used in fourier series to represent fluctuations
          */
-        label nmodes() const {
+        inline label nmodes() const {
             return m_nmodes;
         }
 
         scalar wew1fct() const {
             return m_minWavelengthFactor;
         }
+
+        /**
+         * @brief visc - returns molecular viscosity value
+         * @return
+         */
         scalar visc() const {
             return m_visc;
         }
-
 
         scalar qm() const {
             return m_qm;
@@ -160,7 +167,7 @@ namespace Foam
             return m_T;
         }
 
-        void computeNonuniformFlucts(const vectorField & coords, vectorField & flucts, bool corelate=true);
+        void computeNonuniformFlucts(const vectorField & coords, const scalar &timeValue, vectorField & flucts, bool corelate=true);
 
         void computeNewFluctuations(const vectorField & coords, vectorField & flucts, bool corelate=true);
 

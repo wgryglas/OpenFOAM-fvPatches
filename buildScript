@@ -1,3 +1,5 @@
 #! /bin/bash
-source /home/wgryglas/OpenFOAM/v1706/OpenFOAM-v1706/etc/bashrc
+
+#source /home/wgryglas/OpenFOAM/v1706/OpenFOAM-v1706/etc/bashrc
+source /home/wgryglas/Code/Cpp/OpenFOAM/OpenFOAM-v1706/etc/bashrc
 wmake libso

@@ -7,6 +7,79 @@
 
 namespace Foam
 {
+    const scalar Cmu = 0.09;
+
+    class intensityScaleParameters : public synTurbulenceParameters {
+        scalar m_tls;
+        scalar m_up;
+        scalar m_eps;
+        scalar m_tts;
+        tmp<scalarField> f_tls;
+        tmp<scalarField> f_umrs;
+        tmp<scalarField> f_eps;
+        tmp<scalarField> f_tts;
+
+        void computeEpsAndTimeScale() {
+            scalar k = 1.5*m_up*m_up;
+            m_eps = pow(Cmu, 0.75) * pow(k, 1.5) / m_tls;
+
+            if( m_up > 1e-12 ) {
+                m_tts = k / m_eps;
+            }
+            else {
+                m_tts = 1.0;
+            }
+        }
+
+    public:
+        intensityScaleParameters(const dictionary& dict, const scalar& refVelocity) {
+            scalar ti;
+            dict.lookup("turbIntensity") >> ti;
+            dict.lookup("turbScale") >> m_tls;
+            m_up = ti * refVelocity;
+            computeEpsAndTimeScale();
+        }
+
+        intensityScaleParameters(const scalar& refVelocity, const scalar& intensity, const scalar& lengthScale):
+            m_tls(lengthScale), m_up(intensity * refVelocity)
+        {
+            computeEpsAndTimeScale();
+        }
+
+        const scalarField& getTurbLengthScales() const {
+            return f_tts.ref();
+        }
+
+        const scalarField& getUrms() const {
+            return f_umrs.ref();
+        }
+
+        const scalarField& getDissipationRates() const {
+            return f_eps.ref();
+        }
+
+        const scalarField& getTimeScales() const {
+            return f_tts.ref();
+        }
+
+        void update(const vectorField &coords, const scalar &timeValue) {
+            if( ! f_tls.valid() ) {
+                f_tls = tmp<scalarField>(new scalarField(coords.size(), m_tls));
+                f_umrs = tmp<scalarField>(new scalarField(coords.size(), m_up));
+                f_eps = tmp<scalarField>(new scalarField(coords.size(), m_eps));
+                f_tts = tmp<scalarField>(new scalarField(coords.size(), m_tts));
+            }
+        }
+
+        virtual void write(Ostream& os) const {
+            os.beginBlock("properties");
+            os.writeEntry("turbLengthScale", m_tls);
+            os.writeEntry("turbTimeScale", m_tts);
+            os.writeEntry("turbDissiaptionRate", m_eps);
+            os.endBlock();
+        }
+    };
+
     static scalar smallestEdgeLength(const fvMesh& mesh) {
         const edgeList& edges = mesh.edges();
         const pointField& pp = mesh.points();
@@ -37,7 +110,8 @@ namespace Foam
         m_T(1.),
         m_u_inf(1.),
         m_ti(0.1),
-        m_angles(m_nmodes) {
+        m_angles(m_nmodes)
+    {
         updateParameters();
     }
 
@@ -57,7 +131,6 @@ namespace Foam
     {
         dict.lookup("nu") >> m_visc;
 
-
         if( dict.found("dxmin") ){
             dict.lookup("dxmin") >> m_dxmin;
         }
@@ -65,9 +138,23 @@ namespace Foam
            m_dxmin = smallestEdgeLength(mesh);
         }
 
+
         dict.lookup("turbIntensity") >> m_ti;
         dict.lookup("turbScale") >> m_sli;
 
+
+        const dictionary& props = dict.subDict("properties");
+        word propType;
+        props.lookup("type") >> propType;
+
+        if(propType == "fixed") {
+            properites = tmp<synTurbulenceParameters>(new intensityScaleParameters(props, 5.0));
+        }
+        else {
+            FatalError << "Properties type not supported";
+        }
+
+        //no need, info stream automatically is handled only in master process
         if(Pstream::master())
             write(Info);
 
@@ -137,24 +224,86 @@ namespace Foam
         return ptr;
     }
 
-    void synTurbulence::computeNonuniformFlucts(const vectorField &coords, vectorField &flucts, bool corelate) {
+    void synTurbulence::computeNonuniformFlucts(const vectorField &coords, const scalar& timeValue, vectorField &rFlucts, bool corelate) {
         using constant::mathematical::pi;
 
         m_angles.RecomputeRandomAngles();
+        const scalarField& theta = m_angles.GetTetha();
+        const scalarField& phi = m_angles.GetPhi();
+        const scalarField& alpha = m_angles.GetAlpha();
+        const scalarField& psi = m_angles.GetPsi();
 
         if(coords.size() == 0)
             return;
 
-        scalar kmin = kMin();
+        properites->update(coords, timeValue);
+
+        scalar kmin = kMin( max(properites->getTurbLengthScales()) );
         scalar kmax = kMax();
 
-        //update in loop if nonuniform eps
-        scalar k_etha = kEtha();
+        scalarField kEthaField = kolmogorovWavelength(visc(), properites->getDissipationRates());
+        const scalarField& UrmsField = properites->getUrms();
 
         label N = coords.size();
-        label M = nmodes();
 
-        vectorField t_flucts(N, vector::zero);
+        vectorField newFlucts(N, vector::zero);
+
+
+        // compute equaly distributed wave numbers, in the center of discret spacing
+        scalar kSpacing = (kmax - kmin) / (nmodes() + 1);
+        scalarField wavelengths(nmodes());
+        forAll(wavelengths, i) {
+            wavelengths[i] = kSpacing/2 + i*kSpacing;
+        }
+
+        // Compute wave vectors using random angles
+        vectorField wavevectors(nmodes(), vector::zero);
+        wavevectors.replace(vector::X, sin(theta)*cos(phi)*wavelengths);
+        wavevectors.replace(vector::Y, sin(theta)*sin(phi)*wavelengths );
+        wavevectors.replace(vector::Z, cos(theta)*wavelengths );
+
+        // Compute sigma also using random angles. This field will guarantee zero divergence
+        // It's a vector that would apply direction to the flucts velocity
+        vectorField sigma(nmodes(), vector::zero);
+        sigma.replace(vector::X,  cos(phi)*cos(theta)*cos(alpha)-sin(phi)*sin(alpha) );
+        sigma.replace(vector::Y,  sin(phi)*cos(theta)*cos(alpha)+cos(phi)*sin(alpha) );
+        sigma.replace(vector::Z, -sin(theta)*cos(alpha) );
+
+        //loop over mesh boundary points
+        for(int i=0; i < N; ++i) {
+            const vector& pntI = coords[i];
+            const scalar& urmsI = UrmsField[i];
+            const scalar& kEthaI = kEthaField[i];
+            vector& fluctsI = newFlucts[i];
+
+            //loop over modes
+            for(int m=0; m < nmodes(); ++m) {
+                //note: I've removed if condition from original code.
+                // The asseration was meaningless and if k spacing would change it might potentially remve highest wavelengths from spectrum
+                // Wavevectors are generated as vector pointing to point on the sphere(R=1), thus any wavevector meets condition
+                // mag(k) < kmax as k is lengths are generated in range <kmin, kmax> (even (kmin, kmax) )
+
+                //flucts amplitude based on von Karman spectrum
+                scalar u = uAmpl(wavelengths[m], kSpacing, urmsI, kmax, kEthaI);
+
+                // fourier series component based on equation:
+                // \vec{v_m} = u_m * cos (\vec{k_m} \cdot \vec{x} + psi_m) \cdot \vec{sigma_m}
+                // where u_m is m-th amplitude, k is wave vector, x coordinate vector, psi phase shift, sigma direction vector
+                fluctsI += (u * cos( (wavevectors[m] & pntI) + psi[m])) * sigma[m];
+            }
+            fluctsI *= 2;
+        }
+
+        if(corelate) {
+            //use nonuniform time scales, respective to given point at boundary
+            scalarField a = exp( -dt()/properites->getTimeScales() );
+            rFlucts = rFlucts * a + sqrt(1.0 - a*a)*newFlucts;
+        }
+        else {
+            rFlucts = newFlucts;
+        }
+
+        Warning <<"min/max flucts " << min(mag(rFlucts)) <<"/"<<max(mag(rFlucts)) << endl;
     }
 
 
@@ -218,7 +367,7 @@ namespace Foam
 
         // Wyznacz rownomierny ciag liczb falowych
         for(int m = 0; m<=nmodes(); ++m)
-            wnrf[m] = wnr1+dkl*(double)m;
+            wnrf[m] = wnr1 + dkl*m;
 
         // Wyznacz liczby falowe w srodkach podzialow
         for(int m = 0; m < nmodes(); ++m) {
@@ -335,6 +484,8 @@ namespace Foam
         os.writeKeyword("dxmin") << m_dxmin << token::END_STATEMENT << nl;
         os.writeKeyword("turbIntensity") << m_ti << token::END_STATEMENT << nl;
         os.writeKeyword("turbScale") << m_sli << token::END_STATEMENT << nl;
+
+        properites->write(os);
     }
 
 } //namespace Foam
