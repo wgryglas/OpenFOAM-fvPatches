@@ -88,7 +88,7 @@ synTurbulenceInletFvPatchField::synTurbulenceInletFvPatchField
     if (dict.found("value")) {
         patchField = vectorField("value", dict, p.size());
         flucts_ = patchField - referenceField_;
-        if(average(mag(flucts_)) > 10-6)
+        if(average(mag(flucts_)) > 10-12)
             corelate_ = true;
     }
     else {
@@ -178,7 +178,7 @@ void synTurbulenceInletFvPatchField::updateCoeffs()
 
         synTurb_.setTimeStep(db().time().deltaT().value());
         //synTurb_.computeNewFluctuations(faceCenters, flucts_, corelate_);
-        synTurb_.computeNonuniformFlucts(faceCenters, this->db().time().value(), flucts_, corelate_);
+        synTurb_.computeNonuniformFlucts(faceCenters, referenceField_, this->db().time().value(), flucts_, corelate_);
 
         if( ! corelate_ )
             corelate_ = true;

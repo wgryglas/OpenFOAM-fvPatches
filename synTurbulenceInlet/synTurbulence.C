@@ -33,20 +33,16 @@ namespace Foam
         }
 
     public:
-        intensityScaleParameters(const dictionary& dict, const scalar& refVelocity) {
+        intensityScaleParameters(const dictionary& dict) {
 
             dict.lookup("turbIntensity") >> m_ti;
-            m_up = m_ti * refVelocity;
 
             dict.lookup("turbScale") >> m_tls;
-
-            computeEpsAndTimeScale();
         }
 
-        intensityScaleParameters(const scalar& refVelocity, const scalar& intensity, const scalar& lengthScale):
-            m_tls(lengthScale), m_up(intensity * refVelocity)
+        intensityScaleParameters(const scalar& intensity, const scalar& lengthScale):
+            m_tls(lengthScale), m_ti(intensity)
         {
-            computeEpsAndTimeScale();
         }
 
         const scalarField& getTurbLengthScales() const {
@@ -65,8 +61,10 @@ namespace Foam
             return f_tts.ref();
         }
 
-        void update(const vectorField &coords, const scalar &timeValue) {
+        void update(const vectorField &coords, const vectorField& refVelocity, const scalar &timeValue) {
             if( ! f_tls.valid() ) {
+                m_up = m_ti * average(mag(refVelocity));
+                computeEpsAndTimeScale();
                 f_tls = tmp<scalarField>(new scalarField(coords.size(), m_tls));
                 f_umrs = tmp<scalarField>(new scalarField(coords.size(), m_up));
                 f_eps = tmp<scalarField>(new scalarField(coords.size(), m_eps));
@@ -153,8 +151,9 @@ namespace Foam
         word propType;
         props.lookup("type") >> propType;
 
+
         if(propType == "fixed") {
-            properites = tmp<synTurbulenceParameters>(new intensityScaleParameters(props, 5.0));
+            properites = tmp<synTurbulenceParameters>(new intensityScaleParameters(props));
         }
         else {
             FatalError << "Properties type not supported";
@@ -230,7 +229,7 @@ namespace Foam
         return ptr;
     }
 
-    void synTurbulence::computeNonuniformFlucts(const vectorField &coords, const scalar& timeValue, vectorField &rFlucts, bool corelate) {
+    void synTurbulence::computeNonuniformFlucts(const vectorField &coords, const vectorField& refVelocity, const scalar& timeValue, vectorField &rFlucts, bool corelate) {
         using constant::mathematical::pi;
 
         m_angles.RecomputeRandomAngles();
@@ -242,7 +241,7 @@ namespace Foam
         if(coords.size() == 0)
             return;
 
-        properites->update(coords, timeValue);
+        properites->update(coords, refVelocity, timeValue);
 
         scalar kmin = kMin( max(properites->getTurbLengthScales()) );
         scalar kmax = kMax();
@@ -301,7 +300,7 @@ namespace Foam
         }
 
         if(corelate) {
-            //use nonuniform time scales, respective to given point at boundary
+            //use nonuniform time scales, respectively to given point at boundary
             scalarField a = exp( -dt()/properites->getTimeScales() );
             rFlucts = rFlucts * a + sqrt(1.0 - a*a)*newFlucts;
         }

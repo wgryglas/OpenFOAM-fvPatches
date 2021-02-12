@@ -13,8 +13,8 @@
 
 namespace Foam
 {
-    struct synTurbulenceParameters: tmp<synTurbulenceParameters>::refCount {
-        virtual void update(const vectorField& coords, const scalar& timeValue) = 0;
+    struct synTurbulenceParameters: tmp<synTurbulenceParameters>::refCount {                     
+        virtual void update(const vectorField& coords, const vectorField& refVelocity, const scalar& timeValue) = 0;
         virtual const scalarField& getTurbLengthScales() const  = 0;
         virtual const scalarField& getUrms() const  = 0;
         virtual const scalarField& getDissipationRates() const  = 0;
@@ -167,7 +167,7 @@ namespace Foam
             return m_T;
         }
 
-        void computeNonuniformFlucts(const vectorField & coords, const scalar &timeValue, vectorField & flucts, bool corelate=true);
+        void computeNonuniformFlucts(const vectorField & coords, const vectorField& refVelocity, const scalar &timeValue, vectorField & flucts, bool corelate=true);
 
         void computeNewFluctuations(const vectorField & coords, vectorField & flucts, bool corelate=true);
 
