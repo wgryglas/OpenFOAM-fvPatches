@@ -14,6 +14,7 @@ namespace Foam
         scalar m_up;
         scalar m_eps;
         scalar m_tts;
+        scalar m_ti;
         tmp<scalarField> f_tls;
         tmp<scalarField> f_umrs;
         tmp<scalarField> f_eps;
@@ -33,10 +34,12 @@ namespace Foam
 
     public:
         intensityScaleParameters(const dictionary& dict, const scalar& refVelocity) {
-            scalar ti;
-            dict.lookup("turbIntensity") >> ti;
+
+            dict.lookup("turbIntensity") >> m_ti;
+            m_up = m_ti * refVelocity;
+
             dict.lookup("turbScale") >> m_tls;
-            m_up = ti * refVelocity;
+
             computeEpsAndTimeScale();
         }
 
@@ -73,9 +76,12 @@ namespace Foam
 
         virtual void write(Ostream& os) const {
             os.beginBlock("properties");
-            os.writeEntry("turbLengthScale", m_tls);
+            os.writeEntry("type", "fixed");
+            os.writeEntry("turbScale", m_tls);
             os.writeEntry("turbTimeScale", m_tts);
             os.writeEntry("turbDissiaptionRate", m_eps);
+            os.writeEntry("turbIntensity", m_ti);
+            os.writeEntry("turbUp", m_up);
             os.endBlock();
         }
     };
@@ -303,7 +309,7 @@ namespace Foam
             rFlucts = newFlucts;
         }
 
-        Warning <<"min/max flucts " << min(mag(rFlucts)) <<"/"<<max(mag(rFlucts)) << endl;
+        Info <<"min/max flucts " << min(mag(rFlucts)) <<"/"<<max(mag(rFlucts)) << endl;
     }
 
 
