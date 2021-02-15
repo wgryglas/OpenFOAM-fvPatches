@@ -1,6 +1,8 @@
 synTurbulenceInlet/randomAngles.C
 synTurbulenceInlet/synTurbulence.C
 synTurbulenceInlet/synTurbulenceInletFvPatchField.C
+synTurbulenceInlet/fixedTurbProperties.cpp
+synTurbulenceInlet/interpolatedTurbProperties.cpp
 
 
 LIB = $(FOAM_USER_LIBBIN)/libuserFvPatches

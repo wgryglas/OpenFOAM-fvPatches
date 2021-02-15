@@ -5,85 +5,11 @@
 #include "Pstream.H"
 #include <limits>
 
+#include "fixedTurbProperties.h"
+#include "interpolatedTurbProperties.h"
+
 namespace Foam
 {
-    const scalar Cmu = 0.09;
-
-    class intensityScaleParameters : public synTurbulenceParameters {
-        scalar m_tls;
-        scalar m_up;
-        scalar m_eps;
-        scalar m_tts;
-        scalar m_ti;
-        tmp<scalarField> f_tls;
-        tmp<scalarField> f_umrs;
-        tmp<scalarField> f_eps;
-        tmp<scalarField> f_tts;
-
-        void computeEpsAndTimeScale() {
-            scalar k = 1.5*m_up*m_up;
-            m_eps = pow(Cmu, 0.75) * pow(k, 1.5) / m_tls;
-
-            if( m_up > 1e-12 ) {
-                m_tts = k / m_eps;
-            }
-            else {
-                m_tts = 1.0;
-            }
-        }
-
-    public:
-        intensityScaleParameters(const dictionary& dict) {
-
-            dict.lookup("turbIntensity") >> m_ti;
-
-            dict.lookup("turbScale") >> m_tls;
-        }
-
-        intensityScaleParameters(const scalar& intensity, const scalar& lengthScale):
-            m_tls(lengthScale), m_ti(intensity)
-        {
-        }
-
-        const scalarField& getTurbLengthScales() const {
-            return f_tts.ref();
-        }
-
-        const scalarField& getUrms() const {
-            return f_umrs.ref();
-        }
-
-        const scalarField& getDissipationRates() const {
-            return f_eps.ref();
-        }
-
-        const scalarField& getTimeScales() const {
-            return f_tts.ref();
-        }
-
-        void update(const vectorField &coords, const vectorField& refVelocity, const scalar &timeValue) {
-            if( ! f_tls.valid() ) {
-                m_up = m_ti * average(mag(refVelocity));
-                computeEpsAndTimeScale();
-                f_tls = tmp<scalarField>(new scalarField(coords.size(), m_tls));
-                f_umrs = tmp<scalarField>(new scalarField(coords.size(), m_up));
-                f_eps = tmp<scalarField>(new scalarField(coords.size(), m_eps));
-                f_tts = tmp<scalarField>(new scalarField(coords.size(), m_tts));
-            }
-        }
-
-        virtual void write(Ostream& os) const {
-            os.beginBlock("properties");
-            os.writeEntry("type", "fixed");
-            os.writeEntry("turbScale", m_tls);
-            os.writeEntry("turbTimeScale", m_tts);
-            os.writeEntry("turbDissiaptionRate", m_eps);
-            os.writeEntry("turbIntensity", m_ti);
-            os.writeEntry("turbUp", m_up);
-            os.endBlock();
-        }
-    };
-
     static scalar smallestEdgeLength(const fvMesh& mesh) {
         const edgeList& edges = mesh.edges();
         const pointField& pp = mesh.points();
@@ -99,12 +25,13 @@ namespace Foam
 
     const scalar synTurbulence::Ce = 1.452762113;
 
-    synTurbulence::synTurbulence(const objectRegistry& reg)
+    synTurbulence::synTurbulence(const objectRegistry& reg, const fvPatch &patch)
     :
         db_(reg),
         m_dxmin(0.5),
         m_nmodes(150),
         m_minWavelengthFactor(2.),
+        m_stats(false),
         m_visc(1.),
         m_qm(0.015),
         m_sli(0.05),
@@ -114,27 +41,29 @@ namespace Foam
         m_T(1.),
         m_u_inf(1.),
         m_ti(0.1),
-        m_angles(m_nmodes)
+        m_angles(m_nmodes),
+        m_patch(patch)
     {
         updateParameters();
     }
 
-    synTurbulence::synTurbulence(const objectRegistry& reg, const dictionary& dict, const fvMesh& mesh)
+    synTurbulence::synTurbulence(const objectRegistry& reg, const dictionary& dict, const fvMesh& mesh, const fvPatch &patch)
     :
         db_(reg),
         m_dxmin( 0.5 ),
-        m_nmodes( dict.lookupOrDefault<scalar>("nmodes", 150) ),
-        m_minWavelengthFactor(2.),
+        m_nmodes( dict.lookupOrDefault("nmodes", 150) ),
+        m_minWavelengthFactor(2.0),
+        m_visc(dict.lookupType<scalar>("nu")),
+        m_stats( dict.lookupOrDefault("stats", false) ),
         m_qm(0.015),
         m_sli(0.05),
         m_up(1.),
         m_epsm(1.),
         m_dt(0.1),
         m_u_inf(1.),
-        m_angles(m_nmodes)
+        m_angles(m_nmodes),
+        m_patch(patch)
     {
-        dict.lookup("nu") >> m_visc;
-
         if( dict.found("dxmin") ){
             dict.lookup("dxmin") >> m_dxmin;
         }
@@ -142,10 +71,8 @@ namespace Foam
            m_dxmin = smallestEdgeLength(mesh);
         }
 
-
-        dict.lookup("turbIntensity") >> m_ti;
-        dict.lookup("turbScale") >> m_sli;
-
+//        dict.lookup("turbIntensity") >> m_ti;
+//        dict.lookup("turbScale") >> m_sli;
 
         const dictionary& props = dict.subDict("properties");
         word propType;
@@ -153,8 +80,10 @@ namespace Foam
 
 
         if(propType == "fixed") {
-            properites = tmp<synTurbulenceParameters>(new intensityScaleParameters(props));
+            properites.set(new FixedTurbProperties(props, patch));
         }
+        else if(propType == "interpolated")
+            properites.set(new InterpolatedTurbProperties(props, m_visc, patch));
         else {
             FatalError << "Properties type not supported";
         }
@@ -166,21 +95,36 @@ namespace Foam
         updateParameters();
     }
 
+    synTurbulence::synTurbulence(const synTurbulence &other):
+        db_(other.db_),
+        m_dxmin(other.m_dxmin),
+        m_nmodes(other.m_nmodes),
+        m_minWavelengthFactor(other.m_minWavelengthFactor),
+        m_visc(other.m_visc),
+        m_stats(other.m_stats),
+        m_patch(other.m_patch),
+        m_angles(other.m_angles.GetAlpha().size()),
+        properites(other.properites->clone(other.m_patch))
+    {
+        Info << "Using copy constructor" << endl;
+    }
+
     void synTurbulence::updateParameters() {
         //Read from transoportProperties dictionary
 //        const dictionary& transportProperties = db_.lookupObject<IOdictionary>("transportProperties");
 //        dimensionedScalar viscosity(transportProperties.lookup("nu"));
 //        m_visc = viscosity.value();
-        m_up = m_ti*m_u_inf;
-        m_qm = 1.5*m_up*m_up;
-        m_epsm = Foam::pow(m_qm, 1.5) / m_sli;
 
-        if(m_u_inf != 0) {
-            m_T = m_qm/m_epsm;
-        }
-        else {
-            m_T = 0;
-        }
+//        m_up = m_ti*m_u_inf;
+//        m_qm = 1.5*m_up*m_up;
+//        m_epsm = Foam::pow(m_qm, 1.5) / m_sli;
+
+//        if(m_u_inf != 0) {
+//            m_T = m_qm/m_epsm;
+//        }
+//        else {
+//            m_T = 0;
+//        }
     }
 
     void synTurbulence::setRefVelocity(scalar u_inf) {
@@ -229,7 +173,7 @@ namespace Foam
         return ptr;
     }
 
-    void synTurbulence::computeNonuniformFlucts(const vectorField &coords, const vectorField& refVelocity, const scalar& timeValue, vectorField &rFlucts, bool corelate) {
+    void synTurbulence::computeNonuniformFlucts(const vectorField& refVelocity, const scalar& timeValue, vectorField &rFlucts, bool corelate) {
         using constant::mathematical::pi;
 
         m_angles.RecomputeRandomAngles();
@@ -238,10 +182,26 @@ namespace Foam
         const scalarField& alpha = m_angles.GetAlpha();
         const scalarField& psi = m_angles.GetPsi();
 
+//        Info << "After angles " <<endl;
+
+        const vectorField& coords = m_patch.Cf();
+
         if(coords.size() == 0)
             return;
 
-        properites->update(coords, refVelocity, timeValue);
+//        Info << "Before prop update "<<endl;
+
+
+        properites->update(refVelocity, timeValue);
+
+        if(m_stats) {
+            Info << "Length Scale min/max " << min(properites->getTurbLengthScales()) <<" / " << max(properites->getTurbLengthScales()) << nl;
+            Info << "Dissipation Rate min/max " << min(properites->getDissipationRates()) <<" / " << max(properites->getDissipationRates()) << nl;
+            Info << "Time Scale min/max " << min(properites->getTimeScales()) <<" / " << max(properites->getTimeScales()) << nl;
+            Info << "Umrs min/max " << min(properites->getUrms()) <<" / " << max(properites->getUrms()) << nl;
+        }
+
+//        Info << "After prop update" <<endl;
 
         scalar kmin = kMin( max(properites->getTurbLengthScales()) );
         scalar kmax = kMax();
@@ -255,10 +215,10 @@ namespace Foam
 
 
         // compute equaly distributed wave numbers, in the center of discret spacing
-        scalar kSpacing = (kmax - kmin) / (nmodes() + 1);
-        scalarField wavelengths(nmodes());
+        scalar kSpacing = (kmax - kmin) / (nmodes() - 1);
+        scalarField wavelengths(nmodes(), 0.0);
         forAll(wavelengths, i) {
-            wavelengths[i] = kSpacing/2 + i*kSpacing;
+            wavelengths[i] = kmin + i*kSpacing + kSpacing/2;
         }
 
         // Compute wave vectors using random angles
@@ -273,6 +233,9 @@ namespace Foam
         sigma.replace(vector::X,  cos(phi)*cos(theta)*cos(alpha)-sin(phi)*sin(alpha) );
         sigma.replace(vector::Y,  sin(phi)*cos(theta)*cos(alpha)+cos(phi)*sin(alpha) );
         sigma.replace(vector::Z, -sin(theta)*cos(alpha) );
+
+
+//        Info << "Before loop " <<endl;
 
         //loop over mesh boundary points
         for(int i=0; i < N; ++i) {
@@ -294,8 +257,8 @@ namespace Foam
                 // fourier series component based on equation:
                 // \vec{v_m} = u_m * cos (\vec{k_m} \cdot \vec{x} + psi_m) \cdot \vec{sigma_m}
                 // where u_m is m-th amplitude, k is wave vector, x coordinate vector, psi phase shift, sigma direction vector
-                fluctsI += (u * cos( (wavevectors[m] & pntI) + psi[m])) * sigma[m];
-            }
+                fluctsI += ( u * cos( (wavevectors[m] & pntI) + psi[m]) ) * sigma[m];
+            }            
             fluctsI *= 2;
         }
 
@@ -308,16 +271,18 @@ namespace Foam
             rFlucts = newFlucts;
         }
 
-        Info <<"min/max flucts " << min(mag(rFlucts)) <<"/"<<max(mag(rFlucts)) << endl;
+        if(m_stats)
+            Info <<"Flucts min/max " << min(mag(rFlucts)) <<" / "<<max(mag(rFlucts)) << endl;
     }
 
 
-
-    void synTurbulence::computeNewFluctuations(const vectorField &coords, vectorField &flucts, bool corelate) {
+    void synTurbulence::computeNewFluctuations(vectorField &flucts, bool corelate) {
         using namespace constant::mathematical;
         using namespace Foam;
 
         m_angles.RecomputeRandomAngles();
+
+        const vectorField &coords = m_patch.Cf();
 
         if(coords.size() == 0)
             return;
@@ -487,9 +452,8 @@ namespace Foam
     {
         os.writeKeyword("nu") << m_visc << token::END_STATEMENT << nl;
         os.writeKeyword("dxmin") << m_dxmin << token::END_STATEMENT << nl;
-        os.writeKeyword("turbIntensity") << m_ti << token::END_STATEMENT << nl;
-        os.writeKeyword("turbScale") << m_sli << token::END_STATEMENT << nl;
-
+//        os.writeKeyword("turbIntensity") << m_ti << token::END_STATEMENT << nl;
+//        os.writeKeyword("turbScale") << m_sli << token::END_STATEMENT << nl;
         properites->write(os);
     }
 

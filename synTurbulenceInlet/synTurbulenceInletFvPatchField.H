@@ -81,6 +81,8 @@ SourceFiles
 #include "fixedValueFvPatchFields.H"
 #include "randomAngles.H"
 #include "synTurbulence.H"
+#include "vector.H"
+#include "MappedFile.H"
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
@@ -101,6 +103,11 @@ class synTurbulenceInletFvPatchField
 
         //- Reference field
         vectorField referenceField_;
+
+
+        //- Switch for type of refernece field:  fixed | interpolated
+        word refType_;
+        autoPtr<PatchFunction1Types::MappedFile<vector> > velocityMapper_;
 
         //- Current time index (used for updating)
         label curTimeIndex_;

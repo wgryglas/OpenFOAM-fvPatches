@@ -10,19 +10,10 @@
 #include "vectorField.H"
 #include "fvMesh.H"
 #include "constants.H"
+#include "turbProperties.h"
 
 namespace Foam
 {
-    struct synTurbulenceParameters: tmp<synTurbulenceParameters>::refCount {                     
-        virtual void update(const vectorField& coords, const vectorField& refVelocity, const scalar& timeValue) = 0;
-        virtual const scalarField& getTurbLengthScales() const  = 0;
-        virtual const scalarField& getUrms() const  = 0;
-        virtual const scalarField& getDissipationRates() const  = 0;
-        virtual const scalarField& getTimeScales() const = 0;
-        virtual ~synTurbulenceParameters() {}
-        virtual void write(Ostream& os) const = 0;
-    };
-
     class synTurbulence
     {
         const objectRegistry& db_;
@@ -31,18 +22,24 @@ namespace Foam
         label m_nmodes;
         scalar m_minWavelengthFactor;
         scalar m_visc;
-        scalar m_qm;
-        scalar m_sli;
-        scalar m_up;
-        scalar m_epsm;
-        scalar m_dt;
-        scalar m_T;
-        scalar m_u_inf;
-        scalar m_ti;
+
+        bool m_stats;
+
+
+        scalar m_qm;   //Deprecated, used in old implementation, should be removed. Current values are just defualt
+        scalar m_sli;  //Deprecated, used in old implementation, should be removed. Current values are just defualt
+        scalar m_up;   //Deprecated, used in old implementation, should be removed. Current values are just defualt
+        scalar m_epsm; //Deprecated, used in old implementation, should be removed. Current values are just defualt
+        scalar m_dt;   //Deprecated, used in old implementation, should be removed. Current values are just defualt
+        scalar m_T;    //Deprecated, used in old implementation, should be removed. Current values are just defualt
+        scalar m_u_inf;//Deprecated, used in old implementation, should be removed. Current values are just defualt
+        scalar m_ti;   //Deprecated, used in old implementation, should be removed. Current values are just defualt
+
+        const fvPatch& m_patch;
 
         randomAngles m_angles;
 
-        tmp<synTurbulenceParameters> properites;
+        autoPtr<synTurbulenceParameters> properites;
 
         void updateParameters();
 
@@ -98,8 +95,10 @@ namespace Foam
 
 
     public:
-        synTurbulence(const objectRegistry& reg);
-        synTurbulence(const objectRegistry& reg, const dictionary& dict, const fvMesh& mesh);
+        synTurbulence(const objectRegistry& reg, const fvPatch& patch);
+        synTurbulence(const objectRegistry& reg, const dictionary& dict, const fvMesh& mesh, const fvPatch& patch);
+
+        synTurbulence(const synTurbulence& other);
 
         //Default copy/assign constructors
 
@@ -167,9 +166,9 @@ namespace Foam
             return m_T;
         }
 
-        void computeNonuniformFlucts(const vectorField & coords, const vectorField& refVelocity, const scalar &timeValue, vectorField & flucts, bool corelate=true);
+        void computeNonuniformFlucts(const vectorField& refVelocity, const scalar &timeValue, vectorField & flucts, bool corelate=true);
 
-        void computeNewFluctuations(const vectorField & coords, vectorField & flucts, bool corelate=true);
+        void computeNewFluctuations(vectorField & flucts, bool corelate=true);
 
     };
 
