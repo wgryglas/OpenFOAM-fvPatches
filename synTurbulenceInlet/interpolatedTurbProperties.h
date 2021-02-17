@@ -7,8 +7,8 @@
 namespace Foam {
     class InterpolatedTurbProperties : public synTurbulenceParameters
     {
-        autoPtr<PatchFunction1Types::MappedFile<scalar> > kMapper;
-        autoPtr<PatchFunction1Types::MappedFile<scalar> > omegaMapper;
+        PatchFunction1Types::MappedFile<scalar> kMapper;
+        PatchFunction1Types::MappedFile<scalar> omegaMapper;
 
         scalarField f_tls;
         scalarField f_umrs;
@@ -20,6 +20,10 @@ namespace Foam {
         bool overwriteTimeScale;
 
         InterpolatedTurbProperties(const InterpolatedTurbProperties& other, const fvPatch& patch);
+
+        //prevent copy constructors and defualt
+        InterpolatedTurbProperties(const InterpolatedTurbProperties& other) = delete;
+        InterpolatedTurbProperties() = delete;
 
     public:
         static const word typeName;

@@ -33,6 +33,7 @@ namespace Foam {
     }
 
     void FixedTurbProperties::update(const vectorField& refVelocity, const scalar &timeValue) {
+
         f_umrs = m_ti * max(mag(refVelocity));
 
         scalarField k = 3./2 * (f_umrs * f_umrs);

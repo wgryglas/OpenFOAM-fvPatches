@@ -111,23 +111,29 @@ synTurbulenceInletFvPatchField::synTurbulenceInletFvPatchField
 
     if(refType_ == INTERPOLATED_TYPE) {
         velocityMapper_.set(newVelocityMapper(p, dict));
-        referenceField_ = velocityMapper_->value(db().time().value());
+        referenceField_ = velocityMapper_->value(db().time().timeOutputValue());
     }
     else {
         referenceField_ = tmp<vectorField>(new vectorField("referenceField", dict, p.size()));
     }
 
+    //synTurb_.setRefVelocity(average(mag(referenceField_)));
+
     if (dict.found("value")) {
+        //line below might be unecessary
+        //fixedValueFvPatchVectorField::operator=(vectorField("value", dict, p.size()));
         patchField = vectorField("value", dict, p.size());
         flucts_ = patchField - referenceField_;
-        if(average(mag(flucts_)) > 10-12)
-            corelate_ = true;
+        if(flucts_.size() > 0) {
+            //Pout << "Avg flucts" << average(flucts_) << ", avg field " << average(patchField) <<", avg ref " << average(referenceField_) <<endl;
+            if(average(mag(flucts_+vector(SMALL, SMALL, SMALL))) > 3*SMALL)
+                corelate_ = true;
+        }
     }
     else {
-        patchField = referenceField_;
-        fixedValueFvPatchVectorField::operator=(referenceField_);
+        synTurb_.computeNonuniformFlucts(referenceField_, db().time().timeOutputValue(), flucts_, false);
+        fixedValueFvPatchVectorField::operator=(referenceField_ + flucts_);
     }
-    synTurb_.setRefVelocity(average(mag(referenceField_)));
 }
 
 
@@ -182,8 +188,7 @@ void synTurbulenceInletFvPatchField::autoMap
     referenceField_.autoMap(m);
 
     synTurb_.autoMap(m);
-
-    synTurb_.setRefVelocity(average(mag(referenceField_)));
+    //synTurb_.setRefVelocity(average(mag(referenceField_)));
     if(refType_ == INTERPOLATED_TYPE) {
         velocityMapper_().autoMap(m);
     }
@@ -205,14 +210,16 @@ void synTurbulenceInletFvPatchField::rmap
 
     flucts_.rmap(tiptf.flucts_, addr);
     referenceField_.rmap(tiptf.referenceField_, addr);
-    synTurb_.setRefVelocity(average(mag(referenceField_)));
 
     synTurb_.rmap(tiptf.synTurb_, addr);
+    //synTurb_.setRefVelocity(average(mag(referenceField_ + VSMALL)));
 
-    Info <<" rmap called" << endl;
+
     if(refType_ == INTERPOLATED_TYPE) {
         velocityMapper_().rmap(tiptf.velocityMapper_(), addr);
     }
+
+    Info <<" rmap called" << endl;
 }
 
 #include "OPstream.H"
@@ -224,24 +231,23 @@ void synTurbulenceInletFvPatchField::updateCoeffs()
         return;
     }
 
-//    Warning << "Updating boundary values of "<<this->patch().name()<<", ref field is " << average(mag(referenceField_)) <<", is my proc id " << Pstream::myProcNo() << endl;
+    //Pout << "Updating boundary values of "<<this->patch().name()<<", ref field is " << average(mag(referenceField_)) <<" wtih size "<< size() <<", is my proc id " << Pstream::myProcNo() << endl;
 
     if (curTimeIndex_ != this->db().time().timeIndex())
     {
         vectorField& patchField = *this;
 
-//        Info << "Solving with "<<refType_ << " reference type" << endl;
-
         if(refType_ == INTERPOLATED_TYPE) {
             referenceField_ = velocityMapper_->value( db().time().timeOutputValue() );
-            synTurb_.setRefVelocity(average(mag(referenceField_)));
+            //synTurb_.setRefVelocity(average(mag(referenceField_+ VSMALL)));
         }
 
-//        Info << "Computing flucts"<< endl;
         synTurb_.setTimeStep(db().time().deltaT().value());
 
         //synTurb_.computeNewFluctuations(flucts_, corelate_);
         synTurb_.computeNonuniformFlucts(referenceField_, db().time().timeOutputValue(), flucts_, corelate_);
+
+//        Pout << "Fluctuations updated on " << patch().name() << endl;
 
         if( ! corelate_ )
             corelate_ = true;
@@ -249,33 +255,8 @@ void synTurbulenceInletFvPatchField::updateCoeffs()
         patchField = referenceField_ + flucts_;
 
         if(synTurb_.isPrintingStats()){
-            Info <<"Reference field(avg):"<< average(mag(referenceField_)) <<", Fluctuations (avg)" << average(mag(flucts_)) << endl;
+            Pout <<"Reference field(avg):"<< average(mag(referenceField_)) <<", Fluctuations (avg)" << average(mag(flucts_)) << endl;
         }
-
-//        vectorField& patchField = *this;
-
-//        vectorField randomField(this->size());
-
-//        forAll(patchField, facei)
-//        {
-//            ranGen_.randomise(randomField[facei]);
-//        }
-
-//        // Correction-factor to compensate for the loss of RMS fluctuation
-//        // due to the temporal correlation introduced by the alpha parameter.
-//        scalar rmsCorr = sqrt(12*(2*alpha_ - sqr(alpha_)))/alpha_;
-
-//        patchField =
-//            (1 - alpha_)*patchField
-//          + alpha_*
-//            (
-//                referenceField_
-//              + rmsCorr*cmptMultiply
-//                (
-//                    randomField - 0.5*vector::one,
-//                    fluctuationScale_
-//                )*mag(referenceField_)
-//            );
 
         curTimeIndex_ = this->db().time().timeIndex();
 

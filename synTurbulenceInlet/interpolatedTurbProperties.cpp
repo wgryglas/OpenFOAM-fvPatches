@@ -16,12 +16,14 @@ namespace Foam {
     word InterpolatedTurbProperties::type() const { return InterpolatedTurbProperties::typeName; }
 
     InterpolatedTurbProperties::InterpolatedTurbProperties(const InterpolatedTurbProperties &other, const fvPatch &patch):
-        kMapper( new PatchFunction1Types::MappedFile<scalar>(other.kMapper(), patch.patch()) ),
-        omegaMapper( new PatchFunction1Types::MappedFile<scalar>(other.omegaMapper(), patch.patch()) ),
+        kMapper(other.kMapper, patch.patch()),
+        omegaMapper(other.omegaMapper, patch.patch()),
         f_tls(patch.size()), f_umrs(patch.size()), f_eps(patch.size()), f_tts(patch.size()),
         m_nu(other.m_nu),
         overwriteTimeScale(other.overwriteTimeScale)
     {
+        Pout << "Cloning " << patch.name() << " with size " << patch.size() << endl;
+
         if(overwriteTimeScale && other.f_tts.size() > 0) {
             f_tts = other.f_tts[0];
         }
@@ -31,23 +33,19 @@ namespace Foam {
     }
 
     InterpolatedTurbProperties::InterpolatedTurbProperties(const dictionary& dict, scalar nu, const fvPatch &patch):
-        kMapper(
-            new PatchFunction1Types::MappedFile<scalar>(
-                patch.patch(),
-                "kMapper",
-                dict.subDict("k"),
-                "k",
-                true
-            )
+        kMapper(            
+            patch.patch(),
+            "kMapper",
+            dict.subDict("k"),
+            "k",
+            true
         ),
         omegaMapper(
-            new PatchFunction1Types::MappedFile<scalar>(
-                patch.patch(),
-                "omegaMapper",
-                dict.subDict("omega"),
-                "omega",
-                true
-            )
+            patch.patch(),
+            "omegaMapper",
+            dict.subDict("omega"),
+            "omega",
+            true
         ),
         f_tls(patch.size()), f_umrs(patch.size()), f_eps(patch.size()), f_tts(patch.size()),
         m_nu(nu),
@@ -57,48 +55,57 @@ namespace Foam {
             overwriteTimeScale = true;
             f_tts = dict.lookupType<scalar>(TurbProperties::TIME_SCALE_PROP_NAME);
         }
+
+//        Warning: MappedFile utility requires to run with 0 value (if only 0 value is present as boundaryData) for the first time.
+//        Otherwise in parallel execution it crashes.
+        kMapper.value(0);
+        omegaMapper.value(0);
     }
 
     void InterpolatedTurbProperties::update(const vectorField& refVelocity, const scalar& timeValue) {
-        Info << "Starting update with size: " << refVelocity.size() << endl;
+//        Pout << "Starting update with size: " << refVelocity.size() << endl;
 
-//        scalarField k = kMapper->value(timeValue);
-        scalarField k(refVelocity.size(), 6.88E-03);
-//        Info << "k range: " << min(k) <<" / " << max(k) << nl;
+        if(refVelocity.size() == 0) return;
 
-        Info << "After k update" << endl;
-        //scalarField omega = omegaMapper->value(timeValue);
-        scalarField omega(refVelocity.size(), 100.0);
-//        Info << "omeaga range: " << min(omega) <<" / " << max(omega) << nl;
+//        Pout << "Time " << timeValue << endl;
 
-        Info << "After k/omega update" << endl;
+        scalarField k = kMapper.value(timeValue);
+//        scalarField k(refVelocity.size(), 6.88E-03);
+
+//        Pout << "k range: " << min(k) <<" / " << max(k) << nl;
+
+//        Pout << "After k update" << endl;
+
+        scalarField omega = omegaMapper.value(timeValue);
+//        scalarField omega(refVelocity.size(), 100.0);
+//        Pout << "omeaga range: " << min(omega) <<" / " << max(omega) << nl;
+
+//        Pout << "After k/omega update" << endl;
 
         f_eps = TurbProperties::Cmu * k * omega;
 
 //        Info <<"k/omage range: " << min(k / f_eps) <<" / " <<max(k / f_eps) << nl;
 
-        Info << "After eps update" << endl;
+//        Pout << "After eps update" << endl;
 
         f_umrs = sqrt( (2.0/3) * k);
 
-        Info << "After umrs update" << endl;
+//        Pout << "After umrs update" << endl;
 
         scalarField eps_plus = f_eps + SMALL;
 
         f_tls = pow(k, 3.0/2) / (eps_plus);
 
-        Info << "After ls update" << endl;
+//        Pout << "After ls update" << endl;
 
         if(!overwriteTimeScale) {
             if( max(f_umrs) > SMALL )
                 f_tts = k / (f_eps + SMALL);
             else //perhaps error should be thorwn
                 f_tts = 1.0;
+            //f_tts = sqrt(m_nu / eps_plus );
         }
-
-        //f_tts = sqrt(m_nu / eps_plus );
-
-        Info << "After ts update" << endl;
+//        Pout << "After ts update" << endl;
     }
 
     synTurbulenceParameters *InterpolatedTurbProperties::clone(const fvPatch &patch) const {
@@ -108,8 +115,8 @@ namespace Foam {
     void InterpolatedTurbProperties::autoMap(const fvPatchFieldMapper &mapper) {
         Info << "Calling InterpolatedTurbProperties::autoMap" << nl;
 
-        kMapper->autoMap(mapper);
-        omegaMapper->autoMap(mapper);
+        kMapper.autoMap(mapper);
+        omegaMapper.autoMap(mapper);
 
     }
 
@@ -118,18 +125,18 @@ namespace Foam {
         Info << "Calling InterpolatedTurbProperties::rmap" << nl;
 
         const InterpolatedTurbProperties& tiptf = refCast<const InterpolatedTurbProperties>(pf1);
-        kMapper->rmap(tiptf.kMapper(), addr);
-        omegaMapper->rmap(tiptf.omegaMapper(), addr);
+        kMapper.rmap(tiptf.kMapper, addr);
+        omegaMapper.rmap(tiptf.omegaMapper, addr);
     }
 
     void InterpolatedTurbProperties::write(Ostream& os) const {
         os.beginBlock("properties");
             os.writeEntry("type", "interpolated");
             os.beginBlock("k");
-                kMapper().writeData(os);
+                kMapper.writeData(os);
             os.endBlock();
             os.beginBlock("omega");
-                omegaMapper().writeData(os);
+                omegaMapper.writeData(os);
             os.endBlock();
             if(overwriteTimeScale && f_tts.size() > 0) {
                 os.writeEntry(TurbProperties::TIME_SCALE_PROP_NAME, f_tts[0]);
