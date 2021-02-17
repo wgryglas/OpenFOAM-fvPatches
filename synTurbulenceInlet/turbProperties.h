@@ -9,8 +9,11 @@
 #include "constants.H"
 #include "IOobject.H"
 #include "tmp.H"
+#include "fvPatchField.H"
 
 namespace Foam {
+    class synTurbulenceInletFvPatchField;
+
     struct synTurbulenceParameters: public Foam::tmp<synTurbulenceParameters>::refCount {
         virtual void update(const vectorField& refVelocity, const scalar& timeValue) = 0;
         virtual const scalarField& getTurbLengthScales() const  = 0;
@@ -20,6 +23,10 @@ namespace Foam {
         virtual ~synTurbulenceParameters() {}
         virtual void write(Ostream& os) const = 0;
         virtual synTurbulenceParameters* clone(const fvPatch& patch) const = 0;
+
+        virtual word type() const = 0;
+        virtual void autoMap(const fvPatchFieldMapper&) = 0;
+        virtual void rmap(const synTurbulenceParameters&, const labelList&) = 0;
     };
 }
 

@@ -5,6 +5,9 @@
 namespace Foam {
     const scalar Cmu = 0.09;
 
+    const word FixedTurbProperties::typeName = "fixedTurbProperites";
+    word FixedTurbProperties::type() const { return FixedTurbProperties::typeName; }
+
 
     FixedTurbProperties::FixedTurbProperties(const dictionary& dict, const fvPatch& patch) :
         f_tls(patch.size()), f_umrs(patch.size()), f_eps(patch.size()), f_tts(patch.size())
@@ -20,11 +23,11 @@ namespace Foam {
     }
 
     void FixedTurbProperties::update(const vectorField& refVelocity, const scalar &timeValue) {
-        f_umrs = m_ti * mag(refVelocity);
+        f_umrs = m_ti * max(mag(refVelocity));
 
         scalarField k = 3./2 * (f_umrs * f_umrs);
 
-        f_eps = pow(Cmu, 0.75) * pow(k, 3./2) / (m_tls + SMALL);
+        f_eps = pow(k, 3./2) / (m_tls + SMALL); //pow(Cmu, 0.75) *
 
         if( max(f_umrs) > SMALL )
             f_tts = k / (f_eps + SMALL);

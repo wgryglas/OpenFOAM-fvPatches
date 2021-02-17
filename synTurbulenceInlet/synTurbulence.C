@@ -258,7 +258,7 @@ namespace Foam
                 // \vec{v_m} = u_m * cos (\vec{k_m} \cdot \vec{x} + psi_m) \cdot \vec{sigma_m}
                 // where u_m is m-th amplitude, k is wave vector, x coordinate vector, psi phase shift, sigma direction vector
                 fluctsI += ( u * cos( (wavevectors[m] & pntI) + psi[m]) ) * sigma[m];
-            }            
+            }
             fluctsI *= 2;
         }
 
@@ -446,6 +446,14 @@ namespace Foam
         delete [] sxio;
         delete [] syio;
         delete [] szio;
+    }
+
+    void synTurbulence::autoMap(const fvPatchFieldMapper & mapper) {
+        properites->autoMap(mapper);
+    }
+
+    void synTurbulence::rmap(const synTurbulence & other, const labelList & addrs) {
+        properites->rmap(other.properites(), addrs);
     }
 
     void synTurbulence::write(Ostream& os) const

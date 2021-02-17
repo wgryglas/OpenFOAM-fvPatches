@@ -180,10 +180,14 @@ void synTurbulenceInletFvPatchField::autoMap
     fixedValueFvPatchVectorField::autoMap(m);
     flucts_.autoMap(m);
     referenceField_.autoMap(m);
+
+    synTurb_.autoMap(m);
+
     synTurb_.setRefVelocity(average(mag(referenceField_)));
     if(refType_ == INTERPOLATED_TYPE) {
         velocityMapper_().autoMap(m);
     }
+
     Info <<"autoMap called" << endl;
 }
 
@@ -202,6 +206,9 @@ void synTurbulenceInletFvPatchField::rmap
     flucts_.rmap(tiptf.flucts_, addr);
     referenceField_.rmap(tiptf.referenceField_, addr);
     synTurb_.setRefVelocity(average(mag(referenceField_)));
+
+    synTurb_.rmap(tiptf.synTurb_, addr);
+
     Info <<" rmap called" << endl;
     if(refType_ == INTERPOLATED_TYPE) {
         velocityMapper_().rmap(tiptf.velocityMapper_(), addr);

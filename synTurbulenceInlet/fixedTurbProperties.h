@@ -17,6 +17,9 @@ namespace Foam {
         scalarField f_tts;
 
     public:
+        static const word typeName;
+        word type() const;
+
         FixedTurbProperties(const dictionary& dict, const fvPatch& patch);
         FixedTurbProperties(const scalar& intensity, const scalar& lengthScale, const fvPatch& patch);
 
@@ -35,6 +38,12 @@ namespace Foam {
         void write(Ostream& os) const;
 
         synTurbulenceParameters* clone(const fvPatch &patch) const;
+
+
+        void autoMap(const fvPatchFieldMapper&) {}
+
+        //- Reverse map the given fvPatchField onto this fvPatchField
+        void rmap(const synTurbulenceParameters&, const labelList&) {}
     };
 }
 

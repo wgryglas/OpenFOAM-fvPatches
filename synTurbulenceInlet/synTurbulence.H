@@ -170,6 +170,10 @@ namespace Foam
 
         void computeNewFluctuations(vectorField & flucts, bool corelate=true);
 
+
+        void autoMap(const fvPatchFieldMapper&);
+
+        void rmap(const synTurbulence& other, const labelList& addrs);
     };
 
 } //end namespace foam

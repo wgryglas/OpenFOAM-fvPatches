@@ -20,6 +20,9 @@ namespace Foam {
         InterpolatedTurbProperties(const InterpolatedTurbProperties& other, const fvPatch& patch);
 
     public:
+        static const word typeName;
+        word type() const;
+
         InterpolatedTurbProperties(const dictionary& dict, scalar nu, const fvPatch& patch);
 
         ~InterpolatedTurbProperties() {}
@@ -41,12 +44,16 @@ namespace Foam {
         }
 
 
-
         void write(Ostream& os) const;
 
         void update(const vectorField& refVelocity, const scalar& timeValue);
 
         synTurbulenceParameters* clone(const fvPatch &patch) const;
+
+        void autoMap(const fvPatchFieldMapper&);
+
+        void rmap(const synTurbulenceParameters&, const labelList&);
+
     };
 }
 
