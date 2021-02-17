@@ -22,6 +22,8 @@ INLET_AB
         type fixed;   //optional, fixed by default. Fixed means that all turbulence parameters are the same across BC and time.
         turbIntensity 0.065; //required, turbulent intensity - variable used for Urms calculations from refrenceField
         turbScale 0.02; //required, used for other turb. prop. computation
+
+        timeScale 3e-3; // optional, if not specified will be calculated using k and epsilon: k / (eps + SMALL)
     }
 
     //value $internalField; // optional, will be used for computing fluctations when solver will continue calculations from given time step.
@@ -32,6 +34,7 @@ INLET_AB
 ## Interpolated mean velocity and fixed turbulence parameters
 
 In case of interpolated values you need to provide data inside following case directory:
+```
 /constant/boundaryData/<boundary name>/
          --> points - file with list of points in the form:
              58
@@ -49,7 +52,7 @@ In case of interpolated values you need to provide data inside following case di
              (0.06 0.00015 -0.0225)
              ...
              )
-
+```
 Then in the BC spec. you don't need to define "referenceField" entry.
 Note, the root dictionary (content of { ... } ) is the root of definition for MappedFile utility for "referenceField" interpolation.
 You can place there more properties related to the MappedFile utility:
@@ -82,6 +85,8 @@ INLET_AB
         type fixed;   //optional, fixed by default. Fixed means that all turbulence parameters are the same across BC and time.
         turbIntensity 0.065; //required, turbulent intensity - variable used for Urms calculations from refrenceField
         turbScale 0.02; //required, used for other turb. prop. computation
+
+        timeScale 3e-3; // optional, if not specified will be calculated using k and epsilon: k / (eps + SMALL)
     }
 
     //value $internalField; // optional, will be used for computing fluctations when solver will continue calculations from given time step.
@@ -91,6 +96,7 @@ INLET_AB
 ## Interpolated mean velocity and interpolate turbulence parameters
 
 In case of the all variables interpolated you need to provide data inside following case directory:
+```
 /constant/boundaryData/<boundary name>/
          --> points - file with list of points in the form:
              58
@@ -124,7 +130,7 @@ In case of the all variables interpolated you need to provide data inside follow
              0.06
              ...
              )
-
+```
 Then in the BC spec. you don't need to define "referenceField" entry. Also you need to place 2 new dictionaries under
 properties:
  k {}
@@ -169,6 +175,8 @@ INLET_AB
        omega //required, you might leave {...} content empty, defualts for MappedFile will be used for omega variable
        {
        }
+
+       timeScale 3e-3; // optional, if not specified will be calculated using k and epsilon: k / (eps + SMALL)
     }
 }
 ```
@@ -203,6 +211,8 @@ INLET_AB
        omega //required, you might leave {...} content empty, defualts for MappedFile will be used for omega variable
        {
        }
+
+       timeScale 3e-3; // optional, if not specified will be calculated using k and epsilon: k / (eps + SMALL)
     }
 }
 ```

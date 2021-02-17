@@ -115,6 +115,9 @@ namespace Foam
         void setTimeStep(scalar dt);
 
 
+
+        bool isPrintingStats() const { return m_stats; }
+
         /**
          * @return smallest mesh size
          */

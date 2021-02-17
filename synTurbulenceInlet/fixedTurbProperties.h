@@ -16,12 +16,14 @@ namespace Foam {
         scalarField f_eps;
         scalarField f_tts;
 
+        bool overwriteTimeScale;
+
     public:
         static const word typeName;
         word type() const;
 
         FixedTurbProperties(const dictionary& dict, const fvPatch& patch);
-        FixedTurbProperties(const scalar& intensity, const scalar& lengthScale, const fvPatch& patch);
+        FixedTurbProperties(const FixedTurbProperties& other, const fvPatch& patch);
 
         ~FixedTurbProperties() {}
 

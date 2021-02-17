@@ -233,7 +233,7 @@ void synTurbulenceInletFvPatchField::updateCoeffs()
 //        Info << "Solving with "<<refType_ << " reference type" << endl;
 
         if(refType_ == INTERPOLATED_TYPE) {
-            referenceField_ = velocityMapper_->value( this->db().time().value() );
+            referenceField_ = velocityMapper_->value( db().time().timeOutputValue() );
             synTurb_.setRefVelocity(average(mag(referenceField_)));
         }
 
@@ -241,14 +241,16 @@ void synTurbulenceInletFvPatchField::updateCoeffs()
         synTurb_.setTimeStep(db().time().deltaT().value());
 
         //synTurb_.computeNewFluctuations(flucts_, corelate_);
-        synTurb_.computeNonuniformFlucts(referenceField_, this->db().time().value(), flucts_, corelate_);
+        synTurb_.computeNonuniformFlucts(referenceField_, db().time().timeOutputValue(), flucts_, corelate_);
 
         if( ! corelate_ )
             corelate_ = true;
 
         patchField = referenceField_ + flucts_;
 
-        Info <<"Reference field(avg):"<< average(mag(referenceField_)) <<", Fluctuations (avg)" << average(mag(flucts_)) << endl;
+        if(synTurb_.isPrintingStats()){
+            Info <<"Reference field(avg):"<< average(mag(referenceField_)) <<", Fluctuations (avg)" << average(mag(flucts_)) << endl;
+        }
 
 //        vectorField& patchField = *this;
 

@@ -11,17 +11,23 @@
 */
 
 namespace Foam {
+
     const word InterpolatedTurbProperties::typeName = "interpolatedTurbProperites";
     word InterpolatedTurbProperties::type() const { return InterpolatedTurbProperties::typeName; }
-
-    const scalar Cmu = 0.09;
 
     InterpolatedTurbProperties::InterpolatedTurbProperties(const InterpolatedTurbProperties &other, const fvPatch &patch):
         kMapper( new PatchFunction1Types::MappedFile<scalar>(other.kMapper(), patch.patch()) ),
         omegaMapper( new PatchFunction1Types::MappedFile<scalar>(other.omegaMapper(), patch.patch()) ),
         f_tls(patch.size()), f_umrs(patch.size()), f_eps(patch.size()), f_tts(patch.size()),
-        m_nu(other.m_nu)
+        m_nu(other.m_nu),
+        overwriteTimeScale(other.overwriteTimeScale)
     {
+        if(overwriteTimeScale && other.f_tts.size() > 0) {
+            f_tts = other.f_tts[0];
+        }
+//        else {
+//            FatalErrorInFunction << "Can't copy time scale with overwritten fixed scale, source has 0 size list of time scale values" << exit(FatalError);
+//        }
     }
 
     InterpolatedTurbProperties::InterpolatedTurbProperties(const dictionary& dict, scalar nu, const fvPatch &patch):
@@ -44,8 +50,13 @@ namespace Foam {
             )
         ),
         f_tls(patch.size()), f_umrs(patch.size()), f_eps(patch.size()), f_tts(patch.size()),
-        m_nu(nu)
+        m_nu(nu),
+        overwriteTimeScale(false)
     {
+        if(dict.found(TurbProperties::TIME_SCALE_PROP_NAME)) {
+            overwriteTimeScale = true;
+            f_tts = dict.lookupType<scalar>(TurbProperties::TIME_SCALE_PROP_NAME);
+        }
     }
 
     void InterpolatedTurbProperties::update(const vectorField& refVelocity, const scalar& timeValue) {
@@ -62,7 +73,7 @@ namespace Foam {
 
         Info << "After k/omega update" << endl;
 
-        f_eps = Cmu * k * omega;
+        f_eps = TurbProperties::Cmu * k * omega;
 
 //        Info <<"k/omage range: " << min(k / f_eps) <<" / " <<max(k / f_eps) << nl;
 
@@ -78,10 +89,12 @@ namespace Foam {
 
         Info << "After ls update" << endl;
 
-        if( max(f_umrs) > SMALL )
-            f_tts = k / (f_eps + SMALL);
-        else //perhaps error should be thorwn
-            f_tts = 1.0;
+        if(!overwriteTimeScale) {
+            if( max(f_umrs) > SMALL )
+                f_tts = k / (f_eps + SMALL);
+            else //perhaps error should be thorwn
+                f_tts = 1.0;
+        }
 
         //f_tts = sqrt(m_nu / eps_plus );
 
@@ -118,6 +131,9 @@ namespace Foam {
             os.beginBlock("omega");
                 omegaMapper().writeData(os);
             os.endBlock();
+            if(overwriteTimeScale && f_tts.size() > 0) {
+                os.writeEntry(TurbProperties::TIME_SCALE_PROP_NAME, f_tts[0]);
+            }
         os.endBlock();
     }
 

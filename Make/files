@@ -1,6 +1,7 @@
 synTurbulenceInlet/randomAngles.C
 synTurbulenceInlet/synTurbulence.C
 synTurbulenceInlet/synTurbulenceInletFvPatchField.C
+synTurbulenceInlet/turbProperties.cpp
 synTurbulenceInlet/fixedTurbProperties.cpp
 synTurbulenceInlet/interpolatedTurbProperties.cpp
 

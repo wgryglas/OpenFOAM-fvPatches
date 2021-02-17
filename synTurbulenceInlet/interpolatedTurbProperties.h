@@ -17,6 +17,8 @@ namespace Foam {
 
         scalar m_nu;
 
+        bool overwriteTimeScale;
+
         InterpolatedTurbProperties(const InterpolatedTurbProperties& other, const fvPatch& patch);
 
     public:

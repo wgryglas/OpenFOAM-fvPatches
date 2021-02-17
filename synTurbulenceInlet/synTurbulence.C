@@ -75,9 +75,7 @@ namespace Foam
 //        dict.lookup("turbScale") >> m_sli;
 
         const dictionary& props = dict.subDict("properties");
-        word propType;
-        props.lookup("type") >> propType;
-
+        word propType = props.lookupType<word>("type");
 
         if(propType == "fixed") {
             properites.set(new FixedTurbProperties(props, patch));
@@ -194,7 +192,7 @@ namespace Foam
 
         properites->update(refVelocity, timeValue);
 
-        if(m_stats) {
+        if(isPrintingStats()) {
             Info << "Length Scale min/max " << min(properites->getTurbLengthScales()) <<" / " << max(properites->getTurbLengthScales()) << nl;
             Info << "Dissipation Rate min/max " << min(properites->getDissipationRates()) <<" / " << max(properites->getDissipationRates()) << nl;
             Info << "Time Scale min/max " << min(properites->getTimeScales()) <<" / " << max(properites->getTimeScales()) << nl;
@@ -460,6 +458,7 @@ namespace Foam
     {
         os.writeKeyword("nu") << m_visc << token::END_STATEMENT << nl;
         os.writeKeyword("dxmin") << m_dxmin << token::END_STATEMENT << nl;
+        os.writeKeyword("stats") << m_stats << token::END_STATEMENT << nl;
 //        os.writeKeyword("turbIntensity") << m_ti << token::END_STATEMENT << nl;
 //        os.writeKeyword("turbScale") << m_sli << token::END_STATEMENT << nl;
         properites->write(os);

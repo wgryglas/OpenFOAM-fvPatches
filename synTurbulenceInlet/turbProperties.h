@@ -12,6 +12,12 @@
 #include "fvPatchField.H"
 
 namespace Foam {
+
+    namespace TurbProperties {
+        extern const scalar Cmu;
+        extern const word TIME_SCALE_PROP_NAME;
+    }
+
     class synTurbulenceInletFvPatchField;
 
     struct synTurbulenceParameters: public Foam::tmp<synTurbulenceParameters>::refCount {
