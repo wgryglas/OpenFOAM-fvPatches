@@ -193,7 +193,7 @@ void synTurbulenceInletFvPatchField::autoMap
         velocityMapper_().autoMap(m);
     }
 
-    Info <<"autoMap called" << endl;
+    //Info <<"autoMap called" << endl;
 }
 
 
@@ -219,7 +219,7 @@ void synTurbulenceInletFvPatchField::rmap
         velocityMapper_().rmap(tiptf.velocityMapper_(), addr);
     }
 
-    Info <<" rmap called" << endl;
+    //Info <<" rmap called" << endl;
 }
 
 #include "OPstream.H"

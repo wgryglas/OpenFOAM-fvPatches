@@ -87,8 +87,7 @@ namespace Foam
         }
 
         //no need, info stream automatically is handled only in master process
-        if(Pstream::master())
-            write(Info);
+        write(Info);
 
         updateParameters();
     }
@@ -104,7 +103,7 @@ namespace Foam
         m_angles(other.m_angles.GetAlpha().size()),
         properites(other.properites->clone(other.m_patch))
     {
-        Info << "Using copy constructor" << endl;
+        //Info << "Using copy constructor" << endl;
     }
 
     void synTurbulence::updateParameters() {
