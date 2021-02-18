@@ -54,7 +54,7 @@ synTurbulenceInletFvPatchField::synTurbulenceInletFvPatchField
     refType_(FIXED_TYPE),
     corelate_(false)
 {
-    Pout <<"(p, iF) const. called" << endl;
+//    Pout <<"(p, iF) const. called" << endl;
 }
 
 //TODO fix synTurb constructor
@@ -80,7 +80,7 @@ synTurbulenceInletFvPatchField::synTurbulenceInletFvPatchField
         //vectorField& patchField = *this;
 //        patchField=(referenceField_ + flucts_);
     }
-    Pout <<"(ptf, p, iF, mapper) const. called" << endl;
+//    Pout <<"(ptf, p, iF, mapper) const. called" << endl;
 }
 
 
@@ -127,7 +127,7 @@ synTurbulenceInletFvPatchField::synTurbulenceInletFvPatchField
         fixedValueFvPatchVectorField::operator=(referenceField_);
     }
 
-    Pout <<"(p, iF, dict) const. called" << endl;
+//    Pout <<"(p, iF, dict) const. called" << endl;
 }
 
 
@@ -147,7 +147,7 @@ synTurbulenceInletFvPatchField::synTurbulenceInletFvPatchField
     if(refType_ == INTERPOLATED_TYPE) {
         velocityMapper_.set(cloneMapper(ptf.velocityMapper_()));
     }
-    Pout <<"(ptf) const. called" << endl;
+//    Pout <<"(ptf) const. called" << endl;
 }
 
 
@@ -169,9 +169,9 @@ synTurbulenceInletFvPatchField::synTurbulenceInletFvPatchField
         velocityMapper_.set(cloneMapper(ptf.velocityMapper_()));
     }
 
-    Pout <<"(ptf, iF) const. called" << endl;
-    if(patch().size()> 0)
-        Pout <<"("<<patch().name()<<"="<<patch().size()<<")"<<"Setting flucts: " << min(flucts_) << max(flucts_) << endl;
+//    Pout <<"(ptf, iF) const. called" << endl;
+//    if(patch().size()> 0)
+//        Pout <<"("<<patch().name()<<"="<<patch().size()<<")"<<"Setting flucts: " << min(flucts_) << max(flucts_) << endl;
 }
 
 
@@ -192,7 +192,7 @@ void synTurbulenceInletFvPatchField::autoMap
         velocityMapper_().autoMap(m);
     }
 
-    Pout <<"autoMap called" << endl;
+//    Pout <<"autoMap called" << endl;
 }
 
 
@@ -216,7 +216,7 @@ void synTurbulenceInletFvPatchField::rmap
 //        velocityMapper_().rmap(tiptf.velocityMapper_(), addr);
 //    }
 
-    Info <<"(" << patch().name() << "=" << patch().size() <<")" <<" rmap called" << endl;
+//    Info <<"(" << patch().name() << "=" << patch().size() <<")" <<" rmap called" << endl;
 }
 
 #include "OPstream.H"

@@ -22,7 +22,7 @@ namespace Foam {
         m_nu(other.m_nu),
         overwriteTimeScale(other.overwriteTimeScale)
     {
-        Pout << "Cloning " << patch.name() << " with size " << patch.size() << endl;
+//        Pout << "Cloning " << patch.name() << " with size " << patch.size() << endl;
 
         if(overwriteTimeScale) {
             if(!other.timeScaleMapper.empty()) {
@@ -136,7 +136,7 @@ namespace Foam {
     }
 
     void InterpolatedTurbProperties::autoMap(const fvPatchFieldMapper &mapper) {
-        Info << "Calling InterpolatedTurbProperties::autoMap" << nl;
+//        Info << "Calling InterpolatedTurbProperties::autoMap" << nl;
 
         kMapper.autoMap(mapper);
         omegaMapper.autoMap(mapper);
@@ -147,7 +147,7 @@ namespace Foam {
 
 
     void InterpolatedTurbProperties::rmap(const synTurbulenceParameters &pf1, const labelList & addr) {
-        Pout << "Calling InterpolatedTurbProperties::rmap" << nl;
+//        Pout << "Calling InterpolatedTurbProperties::rmap" << nl;
 
         const InterpolatedTurbProperties& tiptf = refCast<const InterpolatedTurbProperties>(pf1);
 

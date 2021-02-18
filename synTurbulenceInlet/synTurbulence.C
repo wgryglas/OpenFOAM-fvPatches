@@ -236,8 +236,6 @@ namespace Foam
         sigma.replace(vector::Z, -sin(theta)*cos(alpha) );
 
 //        Info << "Before loop " <<endl;
-        scalarField amplitudes(N);
-        scalarField coses(N);
 
         //loop over mesh boundary points
         for(int i=0; i < N; ++i) {
@@ -254,7 +252,7 @@ namespace Foam
                 // The asseration was meaningless and if k spacing would change it might potentially remve highest wavelengths from spectrum
                 // Wavevectors are generated as vector pointing to point on the sphere(R=1), thus any wavevector meets condition
                 // mag(k) < kmax as k is lengths are generated in range <kmin, kmax> (even (kmin, kmax) )
-                if(mag(wavevectors[m]) > kmax) continue;
+                //if(mag(wavevectors[m]) > kmax) continue;
 
                 //flucts amplitude based on von Karman spectrum
                 scalar u = uAmpl(wavelengths[m], kSpacing, urmsI, kmax, kEthaI);
@@ -268,15 +266,8 @@ namespace Foam
                 fluctsI += ( u * cos( (wavevectors[m] & pntI) + psi[m]) ) * sigma[m];
             }
             fluctsI *= 2;
-
-            amplitudes[i] = sumAmpl;
-            coses[i] = maxCos;
         }
 
-        if(isPrintingStats()) {
-            Pout << "("<<m_patch.name() << ")" << "Max amplitude: " << max(amplitudes) << endl;
-            Pout << "("<<m_patch.name() << ")" << "Max cos: " << max(coses) << endl;
-        }
 
         if(corelate) {
             //use nonuniform time scales, respectively to given point at boundary            
