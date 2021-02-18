@@ -87,7 +87,8 @@ namespace Foam
         }
 
         //no need, info stream automatically is handled only in master process
-        write(Info);
+        if(isPrintingStats())
+            write(Info);
 
         updateParameters();
     }
