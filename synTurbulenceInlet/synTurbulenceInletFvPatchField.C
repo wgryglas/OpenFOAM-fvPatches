@@ -53,9 +53,11 @@ synTurbulenceInletFvPatchField::synTurbulenceInletFvPatchField
     synTurb_(db(), p),
     refType_(FIXED_TYPE),
     corelate_(false)
-{}
+{
+    Pout <<"(p, iF) const. called" << endl;
+}
 
-
+//TODO fix synTurb constructor
 synTurbulenceInletFvPatchField::synTurbulenceInletFvPatchField
 (
     const synTurbulenceInletFvPatchField& ptf,
@@ -65,7 +67,7 @@ synTurbulenceInletFvPatchField::synTurbulenceInletFvPatchField
 )
 :
     fixedValueFvPatchVectorField(ptf, p, iF, mapper),
-    flucts_(ptf.flucts_,mapper),
+    flucts_(ptf.flucts_, mapper),
     referenceField_(ptf.referenceField_, mapper),
     refType_(ptf.refType_),
     curTimeIndex_(-1),
@@ -74,7 +76,11 @@ synTurbulenceInletFvPatchField::synTurbulenceInletFvPatchField
 {
     if(refType_ == INTERPOLATED_TYPE) {
         velocityMapper_.set(cloneMapper(p, ptf.velocityMapper_()));
+//        referenceField_ = velocityMapper_->value(db().time().timeOutputValue());
+        //vectorField& patchField = *this;
+//        patchField=(referenceField_ + flucts_);
     }
+    Pout <<"(ptf, p, iF, mapper) const. called" << endl;
 }
 
 
@@ -100,26 +106,28 @@ synTurbulenceInletFvPatchField::synTurbulenceInletFvPatchField
         referenceField_ = velocityMapper_->value(db().time().timeOutputValue());
     }
     else {
-        referenceField_ = tmp<vectorField>(new vectorField("referenceField", dict, p.size()));
+        referenceField_ = vectorField("referenceField", dict, p.size());
     }
 
     //synTurb_.setRefVelocity(average(mag(referenceField_)));
 
-    if (dict.found("value")) {
+    if (dict.found("value") && patch().size() > 0) {
         //line below might be unecessary
         //fixedValueFvPatchVectorField::operator=(vectorField("value", dict, p.size()));
         patchField = vectorField("value", dict, p.size());
         flucts_ = patchField - referenceField_;
-        if(flucts_.size() > 0) {
-            //Pout << "Avg flucts" << average(flucts_) << ", avg field " << average(patchField) <<", avg ref " << average(referenceField_) <<endl;
-            if(average(mag(flucts_+vector(SMALL, SMALL, SMALL))) > 3*SMALL)
-                corelate_ = true;
-        }
+
+        Pout << "(" << patch().name() << ")" << "Avg flucts" << average(flucts_) << ", avg field " << average(patchField) <<", avg ref " << average(referenceField_) <<endl;
+        if(max(mag(flucts_+vector(SMALL, SMALL, SMALL))) > sqrt(3.0)*SMALL + SMALL)
+            corelate_ = true;
     }
     else {
-        synTurb_.computeNonuniformFlucts(referenceField_, db().time().timeOutputValue(), flucts_, false);
-        fixedValueFvPatchVectorField::operator=(referenceField_ + flucts_);
+        //below causes huge flucts and destroys solution while single BC is split onto more than 1 processor
+        //synTurb_.computeNonuniformFlucts(referenceField_, db().time().timeOutputValue(), flucts_, false);
+        fixedValueFvPatchVectorField::operator=(referenceField_);
     }
+
+    Pout <<"(p, iF, dict) const. called" << endl;
 }
 
 
@@ -139,6 +147,7 @@ synTurbulenceInletFvPatchField::synTurbulenceInletFvPatchField
     if(refType_ == INTERPOLATED_TYPE) {
         velocityMapper_.set(cloneMapper(ptf.velocityMapper_()));
     }
+    Pout <<"(ptf) const. called" << endl;
 }
 
 
@@ -159,6 +168,10 @@ synTurbulenceInletFvPatchField::synTurbulenceInletFvPatchField
     if(refType_ == INTERPOLATED_TYPE) {
         velocityMapper_.set(cloneMapper(ptf.velocityMapper_()));
     }
+
+    Pout <<"(ptf, iF) const. called" << endl;
+    if(patch().size()> 0)
+        Pout <<"("<<patch().name()<<"="<<patch().size()<<")"<<"Setting flucts: " << min(flucts_) << max(flucts_) << endl;
 }
 
 
@@ -179,7 +192,7 @@ void synTurbulenceInletFvPatchField::autoMap
         velocityMapper_().autoMap(m);
     }
 
-    //Info <<"autoMap called" << endl;
+    Pout <<"autoMap called" << endl;
 }
 
 
@@ -191,20 +204,19 @@ void synTurbulenceInletFvPatchField::rmap
 {
     fixedValueFvPatchVectorField::rmap(ptf, addr);
 
-    const synTurbulenceInletFvPatchField& tiptf =
-        refCast<const synTurbulenceInletFvPatchField>(ptf);
+    const synTurbulenceInletFvPatchField& tiptf = refCast<const synTurbulenceInletFvPatchField>(ptf);
 
     flucts_.rmap(tiptf.flucts_, addr);
     referenceField_.rmap(tiptf.referenceField_, addr);
 
-    synTurb_.rmap(tiptf.synTurb_, addr);
-    //synTurb_.setRefVelocity(average(mag(referenceField_ + VSMALL)));
+//    synTurb_.rmap(tiptf.synTurb_, addr);
+//    //synTurb_.setRefVelocity(average(mag(referenceField_ + VSMALL)));
 
-    if(refType_ == INTERPOLATED_TYPE) {
-        velocityMapper_().rmap(tiptf.velocityMapper_(), addr);
-    }
+//    if(refType_ == INTERPOLATED_TYPE && tiptf.velocityMapper_.valid() && velocityMapper_.valid()) {
+//        velocityMapper_().rmap(tiptf.velocityMapper_(), addr);
+//    }
 
-    //Info <<" rmap called" << endl;
+    Info <<"(" << patch().name() << "=" << patch().size() <<")" <<" rmap called" << endl;
 }
 
 #include "OPstream.H"
@@ -214,6 +226,13 @@ void synTurbulenceInletFvPatchField::updateCoeffs()
     if (this->updated()) {
         return;
     }
+
+//    if(db().time().timeIndex() == 1) {
+//        flucts_ = vector::zero;
+//    }
+//    else {
+//        Pout <<" time: " << db().time().timeOutputValue() << "vs " << db().time().value() << endl;
+//    }
 
     //Pout << "Updating boundary values of "<<this->patch().name()<<", ref field is " << average(mag(referenceField_)) <<" wtih size "<< size() <<", is my proc id " << Pstream::myProcNo() << endl;
 
@@ -251,9 +270,16 @@ void synTurbulenceInletFvPatchField::updateCoeffs()
 
 void synTurbulenceInletFvPatchField::write(Ostream& os) const {
     fvPatchVectorField::write(os);
-    referenceField_.writeEntry("referenceField", os);
+    if(refType_ == INTERPOLATED_TYPE) {
+        os.writeEntry("referenceType", INTERPOLATED_TYPE);
+    }
+    else {
+        referenceField_.writeEntry("referenceField", os);
+    }
     synTurb_.write(os);
-    this->writeEntry("value", os);
+    //const vectorField& patchField = *this;
+    vectorField current = referenceField_ + flucts_;
+    current.writeEntry("value", os);
 }
 
 

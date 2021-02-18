@@ -181,7 +181,7 @@ namespace Foam
 
 //        Info << "After angles " <<endl;
 
-        const vectorField& coords = m_patch.Cf();
+        const vectorField& coords = m_patch.Cf(); // - average(m_patch.Cf());
 
         if(coords.size() == 0)
             return;
@@ -191,16 +191,21 @@ namespace Foam
         properites->update(refVelocity, timeValue);
 
         if(isPrintingStats()) {
-            Info << "Length Scale min/max " << min(properites->getTurbLengthScales()) <<" / " << max(properites->getTurbLengthScales()) << nl;
-            Info << "Dissipation Rate min/max " << min(properites->getDissipationRates()) <<" / " << max(properites->getDissipationRates()) << nl;
-            Info << "Time Scale min/max " << min(properites->getTimeScales()) <<" / " << max(properites->getTimeScales()) << nl;
-            Info << "Umrs min/max " << min(properites->getUrms()) <<" / " << max(properites->getUrms()) << nl;
+            Info << "("<<m_patch.name() << ")"  << "Length Scale min/max " << min(properites->getTurbLengthScales()) <<" / " << max(properites->getTurbLengthScales()) << nl;
+            Info << "("<<m_patch.name() << ")" << "Dissipation Rate min/max " << min(properites->getDissipationRates()) <<" / " << max(properites->getDissipationRates()) << nl;
+            Info << "("<<m_patch.name() << ")" << "Time Scale min/max " << min(properites->getTimeScales()) <<" / " << max(properites->getTimeScales()) << nl;
+            Info << "("<<m_patch.name() << ")" << "Umrs min/max " << min(properites->getUrms()) <<" / " << max(properites->getUrms()) << nl;
         }
 
 //        Info << "After prop update" <<endl;
 
         scalar kmin = kMin( max(properites->getTurbLengthScales()) );
         scalar kmax = kMax();
+
+
+        if(isPrintingStats()) {
+            Pout << "("<< m_patch.name() << ")kmin/kmax = " << kmin <<" / " << kmax << endl;
+        }
 
         scalarField kEthaField = kolmogorovWavelength(visc(), properites->getDissipationRates());
         const scalarField& UrmsField = properites->getUrms();
@@ -230,8 +235,9 @@ namespace Foam
         sigma.replace(vector::Y,  sin(phi)*cos(theta)*cos(alpha)+cos(phi)*sin(alpha) );
         sigma.replace(vector::Z, -sin(theta)*cos(alpha) );
 
-
 //        Info << "Before loop " <<endl;
+        scalarField amplitudes(N);
+        scalarField coses(N);
 
         //loop over mesh boundary points
         for(int i=0; i < N; ++i) {
@@ -240,26 +246,40 @@ namespace Foam
             const scalar& kEthaI = kEthaField[i];
             vector& fluctsI = newFlucts[i];
 
+            scalar sumAmpl = 0.0;
+            scalar maxCos  = 0.0;
             //loop over modes
             for(int m=0; m < nmodes(); ++m) {
-                //note: I've removed if condition from original code.
+                // note: I've removed if condition from original code.
                 // The asseration was meaningless and if k spacing would change it might potentially remve highest wavelengths from spectrum
                 // Wavevectors are generated as vector pointing to point on the sphere(R=1), thus any wavevector meets condition
                 // mag(k) < kmax as k is lengths are generated in range <kmin, kmax> (even (kmin, kmax) )
+                if(mag(wavevectors[m]) > kmax) continue;
 
                 //flucts amplitude based on von Karman spectrum
                 scalar u = uAmpl(wavelengths[m], kSpacing, urmsI, kmax, kEthaI);
-
+                sumAmpl += u;
+                if(cos( (wavevectors[m] & pntI) + psi[m])) {
+                    maxCos = cos( (wavevectors[m] & pntI) + psi[m]);
+                }
                 // fourier series component based on equation:
                 // \vec{v_m} = u_m * cos (\vec{k_m} \cdot \vec{x} + psi_m) \cdot \vec{sigma_m}
                 // where u_m is m-th amplitude, k is wave vector, x coordinate vector, psi phase shift, sigma direction vector
                 fluctsI += ( u * cos( (wavevectors[m] & pntI) + psi[m]) ) * sigma[m];
             }
             fluctsI *= 2;
+
+            amplitudes[i] = sumAmpl;
+            coses[i] = maxCos;
+        }
+
+        if(isPrintingStats()) {
+            Pout << "("<<m_patch.name() << ")" << "Max amplitude: " << max(amplitudes) << endl;
+            Pout << "("<<m_patch.name() << ")" << "Max cos: " << max(coses) << endl;
         }
 
         if(corelate) {
-            //use nonuniform time scales, respectively to given point at boundary
+            //use nonuniform time scales, respectively to given point at boundary            
             scalarField a = exp( -dt() / properites->getTimeScales() );
             rFlucts = rFlucts * a + sqrt(1.0 - a*a)*newFlucts;
         }
@@ -268,7 +288,7 @@ namespace Foam
         }
 
         if(m_stats)
-            Info <<"Flucts min/max " << min(mag(rFlucts)) <<" / "<<max(mag(rFlucts)) << endl;
+            Info << "("<<m_patch.name() << ")" <<"Flucts min/max " << min(mag(rFlucts)) <<" / "<<max(mag(rFlucts)) << endl;
     }
 
 

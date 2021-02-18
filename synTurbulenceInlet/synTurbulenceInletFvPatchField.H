@@ -117,6 +117,8 @@ class synTurbulenceInletFvPatchField
         synTurbulence synTurb_;
         bool corelate_;
 
+        synTurbulenceInletFvPatchField operator=(const synTurbulenceInletFvPatchField&) = delete;
+
 public:
 
     //- Runtime type information

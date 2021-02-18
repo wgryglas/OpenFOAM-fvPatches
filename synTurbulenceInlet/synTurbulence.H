@@ -92,7 +92,7 @@ namespace Foam
             return sqrt( E(k, u_mrs, k_max, k_eta) * dk );
         }
 
-
+        synTurbulence& operator=(synTurbulence&) = delete;
 
     public:
         synTurbulence(const objectRegistry& reg, const fvPatch& patch);
@@ -100,7 +100,6 @@ namespace Foam
 
         synTurbulence(const synTurbulence& other);
 
-        //Default copy/assign constructors
 
         virtual ~synTurbulence(){}
 

@@ -36,6 +36,11 @@ namespace Foam {
 //        else {
 //            FatalErrorInFunction << "Can't copy time scale with overwritten fixed scale, source has 0 size list of time scale values" << exit(FatalError);
 //        }
+        kMapper.value(0);
+        omegaMapper.value(0);
+        if(!timeScaleMapper.empty()) {
+            timeScaleMapper().value(0);
+        }
     }
 
     InterpolatedTurbProperties::InterpolatedTurbProperties(const dictionary& dict, scalar nu, const fvPatch &patch):
@@ -142,12 +147,14 @@ namespace Foam {
 
 
     void InterpolatedTurbProperties::rmap(const synTurbulenceParameters &pf1, const labelList & addr) {
-        Info << "Calling InterpolatedTurbProperties::rmap" << nl;
+        Pout << "Calling InterpolatedTurbProperties::rmap" << nl;
 
         const InterpolatedTurbProperties& tiptf = refCast<const InterpolatedTurbProperties>(pf1);
+
         kMapper.rmap(tiptf.kMapper, addr);
         omegaMapper.rmap(tiptf.omegaMapper, addr);
-        if(!timeScaleMapper.empty()) {
+
+        if(timeScaleMapper.valid()) {
             timeScaleMapper->rmap(tiptf.timeScaleMapper(), addr);
         }
     }
