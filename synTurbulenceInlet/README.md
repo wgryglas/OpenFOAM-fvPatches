@@ -177,6 +177,10 @@ INLET_AB
        }
 
        timeScale 3e-3; // optional, if not specified will be calculated using k and epsilon: k / (eps + SMALL)
+       //or by interpolation table, similarly to k and omega
+       //timeScale
+       //{
+       //}
     }
 }
 ```
@@ -213,6 +217,10 @@ INLET_AB
        }
 
        timeScale 3e-3; // optional, if not specified will be calculated using k and epsilon: k / (eps + SMALL)
+       //or by interpolation table, similarly to k and omega
+       //timeScale
+       //{
+       //}
     }
 }
 ```
