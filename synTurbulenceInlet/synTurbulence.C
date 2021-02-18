@@ -188,7 +188,6 @@ namespace Foam
 
 //        Info << "Before prop update "<<endl;
 
-
         properites->update(refVelocity, timeValue);
 
         if(isPrintingStats()) {
@@ -261,7 +260,7 @@ namespace Foam
 
         if(corelate) {
             //use nonuniform time scales, respectively to given point at boundary
-            scalarField a = exp( -dt()/properites->getTimeScales() );
+            scalarField a = exp( -dt() / properites->getTimeScales() );
             rFlucts = rFlucts * a + sqrt(1.0 - a*a)*newFlucts;
         }
         else {

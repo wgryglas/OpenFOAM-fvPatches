@@ -28,6 +28,7 @@ License
 #include "volFields.H"
 #include "Time.H"
 #include "Pstream.H"
+#include "turbProperties.h"
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 #include <string>
 namespace Foam
@@ -36,21 +37,6 @@ namespace Foam
 const word FIXED_TYPE = "fixed";
 const word INTERPOLATED_TYPE = "interpolated";
 
-PatchFunction1Types::MappedFile<vector>* newVelocityMapper(const fvPatch& p, const dictionary& dict) {
-    return new PatchFunction1Types::MappedFile<vector>(
-                p.patch(),
-                "velocityMapper",
-                dict,
-                "U",
-                true
-            );
-}
-PatchFunction1Types::MappedFile<vector>* cloneVelocityMapper(const fvPatch& p, const PatchFunction1Types::MappedFile<vector>& other) {
-    return new PatchFunction1Types::MappedFile<vector>(other, p.patch());
-}
-PatchFunction1Types::MappedFile<vector>* cloneVelocityMapper(const PatchFunction1Types::MappedFile<vector>& other) {
-    return new PatchFunction1Types::MappedFile<vector>(other);
-}
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
@@ -87,7 +73,7 @@ synTurbulenceInletFvPatchField::synTurbulenceInletFvPatchField
     corelate_(false)
 {
     if(refType_ == INTERPOLATED_TYPE) {
-        velocityMapper_.set(cloneVelocityMapper(p, ptf.velocityMapper_()));
+        velocityMapper_.set(cloneMapper(p, ptf.velocityMapper_()));
     }
 }
 
@@ -110,7 +96,7 @@ synTurbulenceInletFvPatchField::synTurbulenceInletFvPatchField
     vectorField& patchField = *this;
 
     if(refType_ == INTERPOLATED_TYPE) {
-        velocityMapper_.set(newVelocityMapper(p, dict));
+        velocityMapper_.set(newMapper<vector>("U", p, dict));
         referenceField_ = velocityMapper_->value(db().time().timeOutputValue());
     }
     else {
@@ -151,7 +137,7 @@ synTurbulenceInletFvPatchField::synTurbulenceInletFvPatchField
     corelate_(false)
 {
     if(refType_ == INTERPOLATED_TYPE) {
-        velocityMapper_.set(cloneVelocityMapper(ptf.velocityMapper_()));
+        velocityMapper_.set(cloneMapper(ptf.velocityMapper_()));
     }
 }
 
@@ -171,7 +157,7 @@ synTurbulenceInletFvPatchField::synTurbulenceInletFvPatchField
     corelate_(false)
 {
     if(refType_ == INTERPOLATED_TYPE) {
-        velocityMapper_.set(cloneVelocityMapper(ptf.velocityMapper_()));
+        velocityMapper_.set(cloneMapper(ptf.velocityMapper_()));
     }
 }
 
@@ -214,7 +200,6 @@ void synTurbulenceInletFvPatchField::rmap
     synTurb_.rmap(tiptf.synTurb_, addr);
     //synTurb_.setRefVelocity(average(mag(referenceField_ + VSMALL)));
 
-
     if(refType_ == INTERPOLATED_TYPE) {
         velocityMapper_().rmap(tiptf.velocityMapper_(), addr);
     }
@@ -226,15 +211,14 @@ void synTurbulenceInletFvPatchField::rmap
 #include "IPstream.H"
 void synTurbulenceInletFvPatchField::updateCoeffs()
 {
-    if (this->updated())
-    {
+    if (this->updated()) {
         return;
     }
 
     //Pout << "Updating boundary values of "<<this->patch().name()<<", ref field is " << average(mag(referenceField_)) <<" wtih size "<< size() <<", is my proc id " << Pstream::myProcNo() << endl;
 
-    if (curTimeIndex_ != this->db().time().timeIndex())
-    {
+    if (curTimeIndex_ != this->db().time().timeIndex()) {
+
         vectorField& patchField = *this;
 
         if(refType_ == INTERPOLATED_TYPE) {
@@ -254,7 +238,7 @@ void synTurbulenceInletFvPatchField::updateCoeffs()
 
         patchField = referenceField_ + flucts_;
 
-        if(synTurb_.isPrintingStats()){
+        if(synTurb_.isPrintingStats()) {
             Pout <<"Reference field(avg):"<< average(mag(referenceField_)) <<", Fluctuations (avg)" << average(mag(flucts_)) << endl;
         }
 
@@ -265,8 +249,7 @@ void synTurbulenceInletFvPatchField::updateCoeffs()
 }
 
 
-void synTurbulenceInletFvPatchField::write(Ostream& os) const
-{
+void synTurbulenceInletFvPatchField::write(Ostream& os) const {
     fvPatchVectorField::write(os);
     referenceField_.writeEntry("referenceField", os);
     synTurb_.write(os);

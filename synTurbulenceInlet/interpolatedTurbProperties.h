@@ -2,7 +2,7 @@
 #define INTERPOLATEDTURBPROPERTIES_H
 
 #include "synTurbulence.H"
-#include "MappedFile.H"
+
 
 namespace Foam {
     class InterpolatedTurbProperties : public synTurbulenceParameters
@@ -18,6 +18,8 @@ namespace Foam {
         scalar m_nu;
 
         bool overwriteTimeScale;
+        autoPtr<PatchFunction1Types::MappedFile<scalar>> timeScaleMapper;
+
 
         InterpolatedTurbProperties(const InterpolatedTurbProperties& other, const fvPatch& patch);
 

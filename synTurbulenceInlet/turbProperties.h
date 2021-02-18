@@ -10,12 +10,34 @@
 #include "IOobject.H"
 #include "tmp.H"
 #include "fvPatchField.H"
+#include "MappedFile.H"
 
 namespace Foam {
 
     namespace TurbProperties {
         extern const scalar Cmu;
         extern const word TIME_SCALE_PROP_NAME;
+    }
+
+    template<typename T>
+    PatchFunction1Types::MappedFile<T>* newMapper(word name, const fvPatch& p, const dictionary& dict)  {
+        return new PatchFunction1Types::MappedFile<T>(
+                    p.patch(),
+                    name + "Mapper",
+                    dict,
+                    name,
+                    true
+                );
+    }
+
+    template<typename T>
+    PatchFunction1Types::MappedFile<T>* cloneMapper(const fvPatch& p, const PatchFunction1Types::MappedFile<T>& other) {
+        return new PatchFunction1Types::MappedFile<T>(other, p.patch());
+    }
+
+    template<typename T>
+    PatchFunction1Types::MappedFile<T>* cloneMapper(const PatchFunction1Types::MappedFile<T>& other) {
+        return new PatchFunction1Types::MappedFile<T>(other);
     }
 
     class synTurbulenceInletFvPatchField;
